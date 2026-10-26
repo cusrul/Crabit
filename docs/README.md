@@ -1,5 +1,7 @@
 # Crabit 文档
 
+从GitHub克隆的前置配置、构建命令及验证范围见[复现构建](reproduction.md)。
+
 ## 使用
 
 - [快速使用](../showcase/docs/start.md)

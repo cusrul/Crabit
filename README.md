@@ -5,6 +5,8 @@ NanoUI 使用 C++ Widget 组合界面，STM32、BW16 和 Windows 共用框架核
 
 ## 从哪里开始
 
+- 从GitHub取得源码并验证构建：[复现说明](docs/reproduction.md)
+
 - 已拿到手表：[快速使用](showcase/docs/start.md) · [连接客户端](showcase/docs/connect.md) · [App 操作](showcase/docs/app-guide.md)
 - 开始开发：[环境搭建](showcase/docs/setup.md) · [第一个 App](showcase/docs/first-app.md) · [系统导读](showcase/docs/system-walkthrough.md)
 - 编译设备：[构建与烧录](docs/guide/build-and-flash.md) · [硬件工程](hardware/altium/crabit-v2/README.md)
