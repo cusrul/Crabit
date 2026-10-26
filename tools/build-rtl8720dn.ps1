@@ -13,9 +13,19 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $sketch = Join-Path $repoRoot "firmware\rtl8720dn\NanoUI"
+$authHeader = Join-Path $sketch "ble_auth.local.h"
+if (-not (Test-Path -LiteralPath $authHeader -PathType Leaf)) {
+    throw "Missing private BLE configuration. Copy firmware/rtl8720dn/NanoUI/ble_auth.local.example.h to ble_auth.local.h and set your own six-digit code. Do not commit it. See docs/reproduction.md."
+}
 $rangeGuard = Join-Path $repoRoot "tools\check-bw16-image.ps1"
 $sharedProtocol = Join-Path $repoRoot "firmware\shared"
 $sharedNanoUi = Join-Path $repoRoot "libraries\NanoUI"
+if (-not $BleSpamLibrary) {
+    $bundledBleSpam = Join-Path $repoRoot "libraries\BW16_BLE_Spam"
+    if (Test-Path -LiteralPath (Join-Path $bundledBleSpam "src\BW16BLESpam.h")) {
+        $BleSpamLibrary = $bundledBleSpam
+    }
+}
 $nanoUiPreflight = Join-Path $repoRoot "firmware\rtl8720dn\NanoUI\src\NanoUI_Preflight.h"
 if ($ArduinoIdeDefaults -and $Profile -ne "product") {
     throw "Arduino IDE defaults validate only the sketch's default product profile."

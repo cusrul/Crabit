@@ -8,6 +8,7 @@ Crabit 原创内容采用 GPL-3.0-only；第三方内容不因此被重新授权
 
 | 内容 | 原有声明入口 | 当前记录 |
 | --- | --- | --- |
+| BW16_BLE_Spam 1.0.0 | [MIT](libraries/BW16_BLE_Spam/LICENSE)、[来源与使用](libraries/BW16_BLE_Spam/README.md) | 维护者提供并确认可分发；保留源码 MIT 声明与原作者元数据 |
 | ARM CMSIS | [CMSIS LICENSE](firmware/stm32/Drivers/CMSIS/LICENSE.txt) | Apache-2.0 文本；仍需保留各文件声明 |
 | STM32L4 HAL | [HAL LICENSE](firmware/stm32/Drivers/STM32L4xx_HAL_Driver/LICENSE.txt) | 指向包级条款；无适用包条款时给出 BSD-3-Clause 回退，不统一改写许可 |
 | STM32 USB Device Library | [USB LICENSE](firmware/stm32/Middlewares/ST/STM32_USB_Device_Library/LICENSE.txt) | 指向包级条款，回退文本为 SLA0044 Rev6/October 2025；**不是统一 BSD/MIT** |

@@ -1,5 +1,8 @@
 # NanoUI
 
+Original NanoUI contributions in this repository are licensed under
+GPL-3.0-only; see LICENSE. Third-party font and asset notices remain applicable.
+
 NanoUI is a small C++ UI framework for embedded displays and host previews. It
 lets an application describe a widget tree once, while a platform supplies the
 canvas, input, clock and font implementation. The maintained implementation in
