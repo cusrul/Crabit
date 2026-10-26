@@ -1,0 +1,4 @@
+{
+  "app_dirs": ["src/apps"],
+  "output_dir": "src/generated"
+}

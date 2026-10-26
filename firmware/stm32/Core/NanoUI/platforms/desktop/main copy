@@ -1,0 +1,507 @@
+#include <SDL2/SDL.h>
+#include <deque>
+#include <iostream>
+#include <vector>
+
+// =========================================================
+// 核心引入
+// =========================================================
+#include "../../src/NanoUI.h"
+#include "sdl_adapter.h"
+#include "sdl_input.h"
+
+// =========================================================
+// 0. 全局资源与数据
+// =========================================================
+
+static const uint8_t icon_sys[] = {
+    0x1c, 0x38, 0x36, 0x6c, 0x63, 0xc6, 0xc0, 0x03, 0xc9, 0x93, 0xc9,
+    0x93, 0xc0, 0x03, 0x63, 0xc6, 0x36, 0x6c, 0x1c, 0x38, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+static const uint8_t icon_sec[] = {
+    0x00, 0x00, 0x03, 0xc0, 0x0f, 0xf0, 0x1f, 0xf8, 0x3f, 0xfc, 0x3f,
+    0xfc, 0x3f, 0xfc, 0x3f, 0xfc, 0x1f, 0xf8, 0x0f, 0xf0, 0x07, 0xe0,
+    0x03, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+static const uint8_t icon_set[] = {
+    0x00, 0x00, 0x06, 0x60, 0x0f, 0xf0, 0x1f, 0xf8, 0x3c, 0x3c, 0x78,
+    0x1e, 0x70, 0x0e, 0x78, 0x1e, 0x3c, 0x3c, 0x1f, 0xf8, 0x0f, 0xf0,
+    0x06, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+// 系统变量
+float sys_load = 0.65f;
+bool virus_active = false;
+bool firewall_on = true;
+bool auto_hack = false;
+float core_voltage = 0.8f;
+
+// 全局折线图数据
+std::deque<float> chart_data(30, 0.0f);
+
+// =========================================================
+// 2. 页面构建
+// =========================================================
+
+Widget *BackBtn() {
+  return new Button(new Container(new Text(" < BACK "), 0, 0, 2, true, 2),
+                    []() { Navigator::pop(); });
+}
+
+Widget *MenuCard(const uint8_t *icon, const char *title, const char *sub,
+                 VoidCallback cb) {
+  return new Button(
+      new Container(new Row({new Image(icon, 16, 16), new SizedBox(6, 0),
+                             new Column({new Text(title), new SizedBox(0, 2),
+                                         new Text(sub, 1)})}),
+                    0, 0, 4, true, 2),
+      cb);
+}
+
+// [页面1] 黑客终端
+Widget *buildHackerPage() {
+  return new Starfield(new Container(
+      new ScrollColumn(
+          {// 包裹在 Button 里，确保能被选中
+           new Button(new Container(
+                          new Row({new Spacer(),
+                                   new GlitchText(" WARNING ", 40, 5, 20, 50),
+                                   new Spacer()}),
+                          0, 0, 2, false),
+                      []() {} // 空回调，仅为了获取焦点
+                      ),
+
+           new SizedBox(0, 8),
+
+           new Row({new Text("PROTOCOL:"), new Spacer(),
+                    new JellySwitch(virus_active,
+                                    [](bool v) { virus_active = v; })}),
+           new SizedBox(0, 6),
+           new Row({new Text("AUTO-HACK:"), new Spacer(),
+                    new Checkbox(auto_hack, [](bool v) { auto_hack = v; })}),
+           new SizedBox(0, 10),
+
+           // 包裹解码动画
+           new Button(
+               new Container(new HackerText("DECRYPTING..."), 0, 0, 4, true),
+               []() {}),
+
+           new SizedBox(0, 15), BackBtn()}),
+      0, 0, 6, true, 4));
+}
+
+// [页面2] 系统状态 (解决卡顿：整合 UI 块)
+Widget *buildStatusPage() {
+  return new Container(
+      new ScrollColumn(
+          {// 标题块
+           new Button(new Container(new Row({new Spacer(),
+                                             new WaveringText("SYSTEM MONITOR",
+                                                              1.5f, 0.2f),
+                                             new Spacer()}),
+                                    0, 50, 2, false),
+                      []() {}),
+
+           new SizedBox(0, 10),
+
+           // --- 1. 折线图模块 (包裹在 Button) ---
+           new Button(
+               new Container(
+                   new Column({new Text("CPU HISTORY:"), new SizedBox(0, 2),
+                               new LineChart(110, 24, &chart_data)}),
+                   0, 50, 2, true, 2 // 加个边框更帅
+                   ),
+               []() {
+                 // 点击图表随机生成一个数据，模拟刷新
+                 float n = (rand() % 100) / 100.0f;
+                 chart_data.push_back(n);
+                 chart_data.pop_front();
+               }),
+
+           new SizedBox(0, 10),
+
+           // --- 2. 波浪图模块 (包裹在 Button) ---
+           new Button(
+               new Container(
+                   new Column({new Row({new Text("LOAD"), new Spacer(),
+                                        new Text("65%")}),
+                               new SizedBox(0, 2),
+                               new WaveProgress(sys_load, 106, 25, 1.5f)}),
+                   0, 0, 2, true, 5),
+               []() {}),
+
+           new SizedBox(0, 6),
+
+           // --- 3. 滑动条 ---
+           new Row({new Text("VOLT"), new Spacer(), new Text("3.3V")}),
+           new SizedBox(0, 2),
+           new Slider(core_voltage, 110, [](float v) { core_voltage = v; }),
+
+           new SizedBox(0, 15), BackBtn()}),
+      0, 0, 6, true, 4);
+}
+
+// [页面3] 设置
+Widget *buildSettingsPage() {
+  return new Container(
+      new ScrollColumn(
+          {new Button(
+               new Container(new Row({new Spacer(), new Text("- CONFIG -"),
+                                      new Spacer()}),
+                             0, 0, 2, false),
+               []() {}),
+           new SizedBox(0, 8),
+
+           new Row({new Text("Firewall"), new Spacer(),
+                    new Switch(firewall_on, [](bool v) { firewall_on = v; })}),
+
+           new SizedBox(0, 10),
+
+           // --- Toast 演示 ---
+           new Button(
+               new Container(new Row({new Spacer(), new Text("[ TEST TOAST ]"),
+                                      new Spacer()}),
+                             110, 16, 0, true, 2),
+               []() { Popup::showToast("SAVED OK!", 2000); }),
+
+           new SizedBox(0, 6),
+
+           // --- Popup 演示 ---
+           new Button(
+               new Container(
+                   new Row({new Spacer(), new GlitchText("[ TEST POPUP ]", 10),
+                            new Spacer()}),
+                   110, 18, 0, true),
+               []() {
+                 Popup::show(
+                     new ScrollColumn(
+                         {new SizedBox(0, 2),
+                          new Row({new Spacer(),
+                                   new WaveringText("WARNING!", 1.5f),
+                                   new Spacer()}),
+                          new SizedBox(0, 4),
+                          new Row({new Spacer(), new Text("Reset Data?"),
+                                   new Spacer()}),
+                          new SizedBox(0, 6),
+                          new Row({new Button(new Text("[YES]"),
+                                              []() { Popup::hide(); }),
+                                   new Spacer(),
+                                   new Button(new Text("[NO]"),
+                                              []() { Popup::hide(); })})}),
+                     100, 50);
+               }),
+
+           new SizedBox(0, 15), BackBtn()}),
+      0, 0, 8, true, 4);
+}
+
+// 在 main.cpp 顶部加入一段小说
+const char *my_novel =
+    "In a world of neon and chrome, a hacker named Case was drifting. "
+    "The sky above the port was the color of television, tuned to a dead "
+    "channel. "
+    "He had been the best, a console cowboy, until he made the wrong move. "
+    "Now, he was just another ghost in the machine, searching for a way back "
+    "into the matrix. "
+    "Suddenly, a data-stream flickered in the corner of his eye... "
+    "PROTOCOL 7-G was active. The deep web was calling him home once again.";
+
+// 创建小说页面
+Widget *buildNovelPage() {
+  return new Container(new NovelReader(my_novel), 0, 0, 0,
+                       false // 全屏沉浸式阅读
+  );
+}
+
+// --- 页面: 表盘 ---
+Widget *buildClockPage() {
+  return new Container(new CyberClock(), 128, 64, 0, true);
+}
+
+// --- 辅助组件：带图标的横向卡片 ---
+Widget *CarouselItem(const uint8_t *icon, const char *title) {
+  return new Button(
+      new Container(
+
+          new Column(
+              {new Spacer(),
+
+               // 1. 图标居中
+               new Row({new Spacer(),
+                        new Image(icon, 16, 16), // 你的 16x16 图标数据
+                        new Spacer()}),
+
+               new SizedBox(0, 4),
+
+               // 2. 标题居中
+               new Row({new Spacer(),
+                        new Text(title, 1), // 使用小号字体 (size=1) 更精致
+                        new Spacer()}),
+               new Spacer()}),
+          30, 30, 0, false, 4 // 宽度缩到 60，高度增加到 36 以容纳图标
+          ),
+      []() { Popup::showToast("MODULE LOADED", 800); });
+}
+
+// --- 页面: 横向图标菜单 ---
+Widget *buildCarouselPage() {
+  return new Container(
+      new Column({
+
+          new Spacer(),
+          // 标题
+          new Row({new Spacer(), new Text("- SYSTEM APPS -"), new Spacer()}),
+          new SizedBox(0,10),
+
+          // 横向滚动容器
+          new Carousel({CarouselItem(icon_sec, "SHELL"),
+                        CarouselItem(icon_sys, "MONIT"),
+                        CarouselItem(icon_set, "CONF"),
+                        CarouselItem(icon_sec, "TOOLS"), // 重用图标演示
+                        CarouselItem(icon_sys, "LOGS")},
+                       10), // 间距 10px
+          new Spacer(),
+
+      }),
+      128, 64, 0, true, 4);
+}
+
+
+
+
+
+
+
+
+
+
+class SnakeGameApp : public Application {
+public:
+    const char* getAppName() override { return "SNAKE"; }
+    
+    // 声明我是独占模式！
+    AppMode getMode() override { return APP_MODE_EXCLUSIVE; }
+
+    // 系统会直接调用这个函数，直到你主动 return 才会切回桌面
+    void runExclusive(Canvas* canvas, InputDriver* input) override {
+        bool playing = true;
+        int x = 64, y = 32;
+
+        while (playing) {
+            // =========================================================
+            // 【SDL 防卡死补丁】维持窗口响应。上真机(AmebaD)时可以删掉这段！
+            SDL_Event sdl_e;
+            while (SDL_PollEvent(&sdl_e)) {
+                if (sdl_e.type == SDL_QUIT) exit(0);
+                ((SDLInputDriver*)input)->injectSDLEvent(sdl_e); 
+            }
+            // =========================================================
+
+            // 1. 自己独占读取按键
+            UIEvent e = input->poll();
+            if (e.type == EVT_BACK) playing = false; // 按返回键退出死循环！
+            if (e.type == EVT_LEFT)  x -= 2;
+            if (e.type == EVT_RIGHT) x += 2;
+            if (e.type == EVT_UP)    y -= 2;
+            if (e.type == EVT_DOWN)  y += 2;
+            
+            // 2. 自己独占清屏画图
+            canvas->clear();
+            canvas->drawRoundRect(x, y, 4, 4, 1, C_WHITE); // 画蛇头
+            canvas->display();
+            
+            // 3. 自己的延时节奏 (不用管系统的 60fps 限制)
+            SDL_Delay(30); 
+        }
+    }
+};
+
+
+
+
+// =========================================================
+// 后台服务：安全守卫 (默默监控系统状态，无界面)
+// =========================================================
+class SecurityDaemon : public Application {
+private:
+    uint32_t lastCheckTime = 0;
+    int attackCount = 0; // 记录攻击次数
+
+public:
+    const char* getAppName() override { return "DAEMON.SEC"; }
+    
+    // 声明我是纯后台服务！
+    AppMode getMode() override { return APP_MODE_BACKGROUND; }
+
+    void onCreate() override {
+        lastCheckTime = hal_get_ticks();
+    }
+
+    void onTick() override {
+        uint32_t now = hal_get_ticks();
+        
+        // 缩短到每 3 秒检查一次
+        if (now - lastCheckTime > 3000) {
+            
+            // 🚨 为了测试，我们让它 100% 触发攻击！
+            attackCount++;
+            
+            // 拼接一个带数字的字符串，让你能看出它是活的
+            char msg[32];
+            snprintf(msg, sizeof(msg), "INTRUSION x%d", attackCount);
+
+            // 弹出全局 Toast (不管现在前台在什么页面，它都会强制浮在最上面)
+            Popup::showToast(msg, 1500); 
+
+            // 通知 OS 刷新屏幕（非常重要：后台任务修改了 UI 必须主动告诉系统重绘）
+            if (WindowManager::instance) WindowManager::instance->markDirty();
+            
+            lastCheckTime = now;
+        }
+    }
+
+    Widget* buildUI() override { return nullptr; } 
+};
+
+
+
+
+
+// [主页]
+Widget *buildMainMenu() {
+  return new Container(
+      new ScrollColumn(
+          {new SizedBox(0, 4),
+
+           // 标题
+           new Button(new Container(new Row({new Spacer(),
+                                             new WaveringText("CYBER OS v2.33",
+                                                              3.0f, 0.1f),
+                                             new Spacer()}),
+                                    0, 0, 0, false),
+                      []() {}),
+
+           new Button(
+               new Container(new Row({new Text(" READ DATA-LOG "), new Spacer(),
+                                      new Text("v1.0", 1)}),
+                             0, 0, 4, true, 2),
+               []() { Navigator::push(new PopupRoot(buildNovelPage())); }),
+
+           new SizedBox(0, 2),
+           new Row({new Spacer(), new Text("ONLINE", 1), new Spacer()}),
+           new SizedBox(0, 8),
+
+           new Button(
+               new Container(
+                   new Row({new Spacer(), new Text(" >> LIVE CLOCK << "),
+                            new Spacer()}),
+                   120, 16, 0, true, 2),
+               []() { Navigator::push(new PopupRoot(buildClockPage())); }),
+
+           new SizedBox(0, 8),
+
+           // ==========================================
+           // 新增：横向滚动卡片入口
+           // ==========================================
+           new Button(
+               new Container(
+                   new Row({new Spacer(), new Text(" > APP CAROUSEL < "),
+                            new Spacer()}),
+                   120, 16, 0, true, 2),
+               []() { Navigator::push(new PopupRoot(buildCarouselPage())); }),
+           new SizedBox(0, 8),
+
+           MenuCard(
+               icon_sec, "TERMINAL", "Hacking Tools",
+               []() { Navigator::push(new PopupRoot(buildHackerPage())); }),
+           new SizedBox(0, 4),
+
+           MenuCard(
+               icon_sys, "STATUS", "LineChart & Wave",
+               []() { Navigator::push(new PopupRoot(buildStatusPage())); }),
+           new SizedBox(0, 4),
+
+           MenuCard(
+               icon_set, "CONFIG", "Toast & Popup",
+               []() { Navigator::push(new PopupRoot(buildSettingsPage())); }),
+
+           new SizedBox(0, 4),
+           MenuCard(
+               icon_sys, "SNAKE", "Exclusive Mode",
+               []() { AppManager::launch(new SnakeGameApp()); }),
+
+           new SizedBox(0, 4),
+            // 5. 底部日期按钮 (已修正：补齐了回调和对齐)
+          new Button(
+              new Row({new Spacer(), new Text("2077.12.31", 1), new Spacer()}),
+              []() { Popup::showToast("TIMELINE STABLE"); } // 补齐回调
+          ),
+          
+          new SizedBox(0, 4)
+           
+        
+          
+        }),
+      0, 0, 0, false);
+}
+
+
+
+
+
+Widget *rootBuild() { return new PopupRoot(buildMainMenu()); }
+
+
+// =========================================================
+// 3. 主程序入口
+// =========================================================
+int main(int argc, char *argv[]) {
+  // 给 NanoUI 注入 SDL 的时间能力 (解决平台强耦合)
+  HAL_Time::init([]() -> uint32_t { return SDL_GetTicks(); });
+
+  if (SDL_Init(SDL_INIT_VIDEO) < 0) return -1;
+
+  SDL_Window *window = SDL_CreateWindow(
+      "NanoUI CyberDeck", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+      128 * 4, 64 * 4, SDL_WINDOW_SHOWN);
+  SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+  SDL_RenderSetScale(renderer, 4, 4);
+
+  SDLAdapter canvas(renderer, 128, 64);
+  SDLInputDriver input;
+  WindowManager wm(&canvas, &input);
+  Navigator::init(&wm);
+
+  // =======================================================
+  // 🚨 【核心修复】NANO-OS 初始化：注入系统的 Canvas 和 Input
+  // 必须有这一步，AppManager 才能把硬件借给贪吃蛇！
+  // =======================================================
+  AppManager::init(&canvas, &input);
+  
+  // 推入主菜单 (包裹上 PopupRoot 以支持全局弹窗)
+  wm.push(new PopupRoot(buildMainMenu()));
+  AppManager::launch(new SecurityDaemon());
+  bool running = true;
+  while (running) {
+    SDL_Event e;
+    while (SDL_PollEvent(&e)) {
+      if (e.type == SDL_QUIT)
+        running = false;
+      input.injectSDLEvent(e);
+    }
+
+    // =======================================================
+    // 🚨 NANO-OS 核心调度三部曲
+    // =======================================================
+    AppManager::tick();  // 1. [逻辑层] 驱动处于协同模式的后台 App
+    wm.update();         // 2. [事件层] 引擎计算 UI 变动与焦点
+    wm.markDirty();
+    wm.drawFrame();      // 3. [渲染层] 把数据画到屏幕上
+    // =======================================================
+
+    SDL_Delay(16);
+  }
+
+  SDL_DestroyRenderer(renderer);
+  SDL_DestroyWindow(window);
+  SDL_Quit();
+  return 0;
+}

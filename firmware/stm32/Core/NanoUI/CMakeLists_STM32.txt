@@ -1,0 +1,19 @@
+cmake_minimum_required(VERSION 3.10)
+project(NanoUI)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+file(GLOB_RECURSE NANOUI_SOURCES "src/*.cpp")
+add_library(nanoui_core STATIC ${NANOUI_SOURCES})
+set_target_properties(nanoui_core PROPERTIES LINKER_LANGUAGE CXX)
+set_target_properties(nanoui_core PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+# target_compile_options(nanoui_core PRIVATE "-fno-lto")
+
+target_include_directories(nanoui_core 
+    PUBLIC 
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples
+        ${CMAKE_CURRENT_SOURCE_DIR}/app_new
+        ${CMAKE_CURRENT_SOURCE_DIR}/app_real
+)

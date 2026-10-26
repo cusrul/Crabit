@@ -1,0 +1,9 @@
+{
+  "app_dirs": ["src", "app", "app_example"],
+  "output_dir": "src",
+  "fonts_dir": "assets/fonts/bdf",
+  "ttf_font": "C:/Windows/Fonts/simhei.ttf",
+  "scan_mode": "all",
+  "bdf_alignment": "center",
+  "font_provider": false
+}

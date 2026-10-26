@@ -1,0 +1,12 @@
+{
+  "app_dirs": ["src/network_ui"],
+  "output_h": "src/network_font_data.h",
+  "output_cpp": "src/network_font_data.cpp",
+  "header_include": "network_font_alias.h",
+  "ttf_font": "C:/Windows/Fonts/simhei.ttf",
+  "scan_mode": "visible",
+  "extra_text": ["联网试验 请在主控发起更新 返回"],
+  "sizes": [8],
+  "bdf_alignment": "center",
+  "font_provider": false
+}

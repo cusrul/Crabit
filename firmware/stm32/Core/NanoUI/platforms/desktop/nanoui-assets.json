@@ -1,0 +1,19 @@
+{
+  "app_dirs": [
+    "../../app_real",
+    "../../../../../../apps/mobile/native/nanoui_sim/platform/stm32"
+  ],
+  "output_h": "../../assets/generated/desktop/NanoUI/nanoui_assets.h",
+  "output_cpp": "../../assets/generated/desktop/nanoui_assets.cpp",
+  "header_include": "NanoUI/nanoui_assets.h",
+  "ttf_font": "C:/Windows/Fonts/simhei.ttf",
+  "scan_mode": "all",
+  "bdf_overrides": {
+    "8": {
+      "path": "../../../../../../libraries/NanoUI/assets/fonts/fusion-pixel-8px/fusion-pixel-8px-monospaced-zh_hans.bdf",
+      "alignment": "center"
+    }
+  },
+  "sizes": [8, 12, 16, 24],
+  "font_provider": false
+}

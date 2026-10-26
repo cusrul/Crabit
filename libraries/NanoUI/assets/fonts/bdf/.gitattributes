@@ -1,0 +1,2 @@
+# Preserve original vendor font bytes; do not normalize/reformat generated BDF.
+*.bdf -text -diff

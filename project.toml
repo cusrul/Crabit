@@ -1,0 +1,44 @@
+schema_version = 1
+
+[project]
+id = "crabit"
+role = "product"
+release_branch = "main"
+
+[components.workflow]
+template = "cpp-cmake"
+path = "tools"
+ci = "none"
+
+[components.workflow.tasks]
+check = ["python", "engineering.py", "check"]
+
+[components.stm32]
+template = "cpp-cmake"
+path = "firmware/stm32"
+ci = "none"
+
+[components.stm32.tasks]
+configure = ["cmake", "--preset", "MinSizeRel"]
+build = ["cmake", "--build", "--preset", "MinSizeRel"]
+
+[components.bw16]
+template = "cpp-cmake"
+path = "firmware/rtl8720dn/NanoUI"
+ci = "none"
+
+[components.bw16.tasks]
+version = ["arduino-cli", "version"]
+
+[components.mobile]
+template = "flutter"
+path = "apps/mobile"
+ci = "none"
+
+[components.mobile.tasks]
+analyze = ["flutter", "analyze"]
+test = ["flutter", "test"]
+build-windows = ["flutter", "build", "windows"]
+
+[deployment]
+enabled = false

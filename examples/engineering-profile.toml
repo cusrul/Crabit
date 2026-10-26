@@ -1,0 +1,8 @@
+# Copy to a private location and set ENGINEERING_PROFILE to its path.
+# Invalid or absent executable paths fall back to PATH.
+[tools]
+node = ["C:/Program Files/nodejs/node.exe"]
+npm = ["C:/Program Files/nodejs/npm.cmd"]
+java = ["C:/Program Files/Java/jdk-21/bin/java.exe"]
+flutter = ["C:/src/flutter/bin/flutter.bat"]
+cmake = ["C:/Program Files/CMake/bin/cmake.exe"]

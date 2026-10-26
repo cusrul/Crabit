@@ -1,0 +1,92 @@
+{
+  "scope": "Display configuration metadata only; not a design update",
+  "method": "Clear the single 2DCONFIGFULLFILENAME value using fixed-width whitespace in its CFB stream",
+  "preserved": "Every other byte of each container; byte length, allocation and record framing unchanged",
+  "native_checks": {
+    "application": "Altium Designer 22.5.1",
+    "pcb_2d_open": true,
+    "pcb_3d_display": true,
+    "seven_edited_libraries_loaded": true,
+    "all_footprints_individually_rendered": false
+  },
+  "limitations": [
+    "Not a DRC or fabrication acceptance",
+    "Not an isolated clean-machine dependency test",
+    "Editing and saving in AD may reintroduce that operator's local view path",
+    "Third-party library redistribution permissions remain unconfirmed"
+  ],
+  "files": [
+    {
+      "file": "Crabit_V2.PcbDoc",
+      "source_sha256": "42f866a5f4016b074be736fc101062c762dd1c9c5aad4db0e54995b9c98a5e14",
+      "trial_sha256": "6d9c5d00a802d20229c1dac8e9e39b56549039bea0d9bc5ffb92c2fbfa9b882d",
+      "field": "2DCONFIGFULLFILENAME",
+      "value_bytes": 146,
+      "other_streams_byte_identical": 133,
+      "all_changes_within_parameter_value": true
+    },
+    {
+      "file": "libraries/4.90 ws2812封装.PcbLib",
+      "source_sha256": "6f6aa9a721e1b60c19524c5601d8c911fd74d6ef3acaf40fcd5c2f8b991a75c5",
+      "trial_sha256": "bc734b88378347924ac8ede266e3a2fb209a3a245b16b58d54705a5515787314",
+      "field": "2DCONFIGFULLFILENAME",
+      "value_bytes": 146,
+      "other_streams_byte_identical": 32,
+      "all_changes_within_parameter_value": true
+    },
+    {
+      "file": "libraries/5.30-BW16.PcbLib",
+      "source_sha256": "600c87de7c0530f2e35df51ebfa4338ddd65478271e699257818821f16ec666c",
+      "trial_sha256": "b3bd591048cce946d7ad5edc300f8e0bd6ecd11d20c6b2e10f015ce3390a5b37",
+      "field": "2DCONFIGFULLFILENAME",
+      "value_bytes": 146,
+      "other_streams_byte_identical": 24,
+      "all_changes_within_parameter_value": true
+    },
+    {
+      "file": "libraries/5.40-SSD1306.PcbLib",
+      "source_sha256": "c64006c9ab7d13a63d7b54172f4fe2320068e2639aacbf4e0e9c2a65d9b3d55b",
+      "trial_sha256": "4ea3d7f880b01e42914ae6021f210e7413a9cbbf5c1e310ff0ab402dfd8cff55",
+      "field": "2DCONFIGFULLFILENAME",
+      "value_bytes": 146,
+      "other_streams_byte_identical": 30,
+      "all_changes_within_parameter_value": true
+    },
+    {
+      "file": "libraries/5.50-蜂鸣器.PcbLib",
+      "source_sha256": "21d5defb6464575c423bb678bf2b3c789014efde68f8df1d3689f926c63a1333",
+      "trial_sha256": "e3c783f0f47fa53027cfd539d556883ddbbe16dd508974519519fc5bc2b7c922",
+      "field": "2DCONFIGFULLFILENAME",
+      "value_bytes": 146,
+      "other_streams_byte_identical": 24,
+      "all_changes_within_parameter_value": true
+    },
+    {
+      "file": "libraries/Crabit.PcbLib",
+      "source_sha256": "ef0b15f4eaca29b4699ab4908e610656f9f149ba2077a39a9b4f6e5ddf7cfdaf",
+      "trial_sha256": "6cd1dc816338ddf79583ecae97b41d438e00dd5a7a92ab070ec4dcfa2014be13",
+      "field": "2DCONFIGFULLFILENAME",
+      "value_bytes": 146,
+      "other_streams_byte_identical": 135,
+      "all_changes_within_parameter_value": true
+    },
+    {
+      "file": "libraries/pcie.PcbLib",
+      "source_sha256": "7219b7ed39472c32b72e3e8cfa525dc32bc5ffb26edcef5ae7031092fce7b589",
+      "trial_sha256": "2c34b210ba1d5a98ac176f9c92a874d88f00cee9dbb41605325042973cf3afe6",
+      "field": "2DCONFIGFULLFILENAME",
+      "value_bytes": 146,
+      "other_streams_byte_identical": 36,
+      "all_changes_within_parameter_value": true
+    },
+    {
+      "file": "libraries/烧录.PcbLib",
+      "source_sha256": "76fc60076be0ef8e35c0bc46bb3e46a45c510d90d58ce946e1c31e5119672045",
+      "trial_sha256": "a1b5fed9441353ed29d26db2c7d718b8da8f60867ecb4dc735d4a3c9e99e48fa",
+      "field": "2DCONFIGFULLFILENAME",
+      "value_bytes": 146,
+      "other_streams_byte_identical": 30,
+      "all_changes_within_parameter_value": true
+    }
+  ]
+}

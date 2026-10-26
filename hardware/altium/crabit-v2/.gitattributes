@@ -1,0 +1,7 @@
+*.SchDoc binary
+*.PcbDoc binary
+*.SchLib binary
+*.SCHLIB binary
+*.PcbLib binary
+*.IntLib binary
+*.PrjPcb text eol=crlf

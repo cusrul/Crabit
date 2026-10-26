@@ -1,0 +1,2 @@
+# Formatter-only dependency. No product SDK or global environment installation.
+black==24.4.2

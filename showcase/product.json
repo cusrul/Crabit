@@ -1,0 +1,11 @@
+{
+  "id": "crabit",
+  "title": "Crabit",
+  "tagline": "戴在手上的极客小玩具",
+  "priceCny": 120,
+  "status": "现货 · 单一配置",
+  "includes": ["手表本体", "电池", "表带"],
+  "excludes": ["外壳", "充电／数据线"],
+  "features": ["无线测试", "USB 键盘脚本", "小游戏与传感器", "NanoUI 与 Flutter"],
+  "modelUrl": "/watch-demo/model.glb"
+}

@@ -1,0 +1,16 @@
+# Google-derived formatting, adapted to Crabit's existing C++ API and indentation.
+# Run only through tools/style.py; do not recursively format SDKs or resources.
+BasedOnStyle: Google
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 100
+UseTab: Never
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+SortIncludes: Never
+IncludeBlocks: Preserve
+DerivePointerAlignment: false
+PointerAlignment: Left
+NamespaceIndentation: None

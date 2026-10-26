@@ -1,0 +1,32 @@
+# Local credentials and signing material
+.env
+.env.*
+!.env.example
+*.local
+*.local.h
+*.jks
+*.keystore
+*.p12
+*.pfx
+key.properties
+project.env
+firmware/rtl8720dn/NanoUI/ble_auth.local.h
+
+# Private maintenance records
+.ai/
+.codex/
+.agents/
+AGENTS.md
+
+# Build output and original media
+**/build/
+**/dist/
+**/node_modules/
+**/__pycache__/
+**/.dart_tool/
+**/.gradle/
+docs/media/raw/
+
+# Local editor files
+**/.idea/
+*.log

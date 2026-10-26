@@ -1,0 +1,280 @@
+{
+  "source_archive": "Crabit (2026-10-26 21-41-06).zip",
+  "archive_sha256": "45484da9f0c1522bd83286143fe3ca9cdba86b292f037fca6e6ff8b5ac26d3e1",
+  "crc_pass": true,
+  "copied_binary_files": [
+    {
+      "file": "Crabit_V2.PcbDoc",
+      "bytes": 13905920,
+      "sha256": "6d9c5d00a802d20229c1dac8e9e39b56549039bea0d9bc5ffb92c2fbfa9b882d",
+      "native_archive_sha256": "42f866a5f4016b074be736fc101062c762dd1c9c5aad4db0e54995b9c98a5e14",
+      "transformation": "fixed-width view configuration path value cleared"
+    },
+    {
+      "file": "l432.SchDoc",
+      "bytes": 591360,
+      "sha256": "d4556695ac42fd57aea675ad490edea71abd4e7e921fa8c8d5a4da6684e9b130"
+    },
+    {
+      "file": "nrf8720dn.SchDoc",
+      "bytes": 551424,
+      "sha256": "ac2931589fa9036ad669f60c18b8b4a01c247f04ba3a6a9f12ac408eedd833f6"
+    },
+    {
+      "file": "libraries/1.01-电阻.PcbLib",
+      "bytes": 6668288,
+      "sha256": "fc6a0020d73732f60614392bce3cbe505e06d8c61847197b386a20f4a1672802"
+    },
+    {
+      "file": "libraries/1.10-电容.PcbLib",
+      "bytes": 26802688,
+      "sha256": "cc69eb3ad6868a26ec7f57964077df48b6111d0059f145654717e00e24270e12"
+    },
+    {
+      "file": "libraries/1.20-电感.PcbLib",
+      "bytes": 23882240,
+      "sha256": "d744d91f825a52bf071b61b5d2c4c9577e26c2193a3872690eab41fa415593c2"
+    },
+    {
+      "file": "libraries/1.30-二极管-整流桥堆.PcbLib",
+      "bytes": 11449344,
+      "sha256": "588675a33d390271168a0d02f8dc8fbe5fca5b341bf12727b9fdf87c15e946d4"
+    },
+    {
+      "file": "libraries/1.31-LED发光二极管.PcbLib",
+      "bytes": 5436416,
+      "sha256": "d375b10a30aa05b46589739ccdbb3dea5f074024e8a198403107e240fbccd662"
+    },
+    {
+      "file": "libraries/1.40-晶振、晶体.PcbLib",
+      "bytes": 7730176,
+      "sha256": "f455aa494b36b747a759148f4c84398eb6e62140d315cc275bc2e3ffee9c6f91"
+    },
+    {
+      "file": "libraries/2.00-SOP、SOIC封装.PcbLib",
+      "bytes": 10446848,
+      "sha256": "ca47901935e897afc3b6d5c02bef37f14f07097ed9e413b0213220960ac9b252"
+    },
+    {
+      "file": "libraries/2.02-SSOP封装.PcbLib",
+      "bytes": 4288512,
+      "sha256": "2fff4d8a39cfca4ec301c254354bc6d3db69df0c589beee78018234d0aa28f8c"
+    },
+    {
+      "file": "libraries/2.07-SOT封装.PcbLib",
+      "bytes": 3937280,
+      "sha256": "1d8763e698b374b28e0df28b0eb5e82619fbcfbe2c900119fd591def25ae5505"
+    },
+    {
+      "file": "libraries/2.10-LQFP封装.PcbLib",
+      "bytes": 16191488,
+      "sha256": "15cac7676f188cf4f7423619c2e7b73a6a6ada9336c26cb4e4536c756ab495db"
+    },
+    {
+      "file": "libraries/2.11-TQFP封装.PcbLib",
+      "bytes": 11777536,
+      "sha256": "b3f0433ce14c9692faec5426eeca2723de0eff714f73d676e60471ea1ba2f76e"
+    },
+    {
+      "file": "libraries/2.12-QFP封装.PcbLib",
+      "bytes": 1830912,
+      "sha256": "5a1190d25e9912b43a5269973f41371c07e46477bc99d7f7c624542b352bb987"
+    },
+    {
+      "file": "libraries/2.20-QFN封装.PcbLib",
+      "bytes": 8477184,
+      "sha256": "b2dc925df96cf7c7e4d7967671bcd0b5520f183d583a667f4823b06472a7894d"
+    },
+    {
+      "file": "libraries/2.21-DFN封装.PcbLib",
+      "bytes": 1122816,
+      "sha256": "074513baa974d72ad133043af6396c7bb43c25d3107db32a909d82bdd96b3605"
+    },
+    {
+      "file": "libraries/2.22-UFQFPN-VFQFPN封装.PcbLib",
+      "bytes": 1019392,
+      "sha256": "837cc68835d0a75c3235995918345c192302c1c55f93df907d9a8dea29f1aaea"
+    },
+    {
+      "file": "libraries/2.40-BGA封装.PcbLib",
+      "bytes": 1152000,
+      "sha256": "8e4aaa120130aebccd349a6ad52f9065f68cfb3be03484c14b9d7ef82e516ec0"
+    },
+    {
+      "file": "libraries/2.41-LGA封装.PcbLib",
+      "bytes": 828416,
+      "sha256": "dc9ef3d8212046a5968eab072f3fe471db6c4af8fa84f9a9cfd820dc398ab025"
+    },
+    {
+      "file": "libraries/3.01-按键按钮.PcbLib",
+      "bytes": 11728384,
+      "sha256": "5cea8b5015f8003a411d516f21cb5995cde6b00b04be54dd464ecb9e7275ce76"
+    },
+    {
+      "file": "libraries/3.11-micro USB 、3.1 Type C接口.PcbLib",
+      "bytes": 20908032,
+      "sha256": "c070683531a43bc74426e153221932eff7aceb86adb1eef58dbe11f3b56f1b87"
+    },
+    {
+      "file": "libraries/3.14-射频天线.PcbLib",
+      "bytes": 450560,
+      "sha256": "e76988c9972912a0a79c0af3dd3eef7651b198e2fa572fe813be46e3dca5c475"
+    },
+    {
+      "file": "libraries/4.50-FPC插座-0.5mm间距.PcbLib",
+      "bytes": 15002112,
+      "sha256": "fa120fe13d39613aee3f46a2381030ca8ba798ac4b37f13200eee4478d63d8c2"
+    },
+    {
+      "file": "libraries/4.90 ws2812封装.PcbLib",
+      "bytes": 315904,
+      "sha256": "bc734b88378347924ac8ede266e3a2fb209a3a245b16b58d54705a5515787314",
+      "native_archive_sha256": "6f6aa9a721e1b60c19524c5601d8c911fd74d6ef3acaf40fcd5c2f8b991a75c5",
+      "transformation": "fixed-width view configuration path value cleared"
+    },
+    {
+      "file": "libraries/5.30-BW16.PcbLib",
+      "bytes": 485888,
+      "sha256": "b3bd591048cce946d7ad5edc300f8e0bd6ecd11d20c6b2e10f015ce3390a5b37",
+      "native_archive_sha256": "600c87de7c0530f2e35df51ebfa4338ddd65478271e699257818821f16ec666c",
+      "transformation": "fixed-width view configuration path value cleared"
+    },
+    {
+      "file": "libraries/5.40-SSD1306.PcbLib",
+      "bytes": 983040,
+      "sha256": "4ea3d7f880b01e42914ae6021f210e7413a9cbbf5c1e310ff0ab402dfd8cff55",
+      "native_archive_sha256": "c64006c9ab7d13a63d7b54172f4fe2320068e2639aacbf4e0e9c2a65d9b3d55b",
+      "transformation": "fixed-width view configuration path value cleared"
+    },
+    {
+      "file": "libraries/5.50-蜂鸣器.PcbLib",
+      "bytes": 136192,
+      "sha256": "e3c783f0f47fa53027cfd539d556883ddbbe16dd508974519519fc5bc2b7c922",
+      "native_archive_sha256": "21d5defb6464575c423bb678bf2b3c789014efde68f8df1d3689f926c63a1333",
+      "transformation": "fixed-width view configuration path value cleared"
+    },
+    {
+      "file": "libraries/Crabit.PcbLib",
+      "bytes": 4707840,
+      "sha256": "6cd1dc816338ddf79583ecae97b41d438e00dd5a7a92ab070ec4dcfa2014be13",
+      "native_archive_sha256": "ef0b15f4eaca29b4699ab4908e610656f9f149ba2077a39a9b4f6e5ddf7cfdaf",
+      "transformation": "fixed-width view configuration path value cleared"
+    },
+    {
+      "file": "libraries/pcie.PcbLib",
+      "bytes": 1516032,
+      "sha256": "2c34b210ba1d5a98ac176f9c92a874d88f00cee9dbb41605325042973cf3afe6",
+      "native_archive_sha256": "7219b7ed39472c32b72e3e8cfa525dc32bc5ffb26edcef5ae7031092fce7b589",
+      "transformation": "fixed-width view configuration path value cleared"
+    },
+    {
+      "file": "libraries/烧录.PcbLib",
+      "bytes": 112128,
+      "sha256": "a1b5fed9441353ed29d26db2c7d718b8da8f60867ecb4dc735d4a3c9e99e48fa",
+      "native_archive_sha256": "76fc60076be0ef8e35c0bc46bb3e46a45c510d90d58ce946e1c31e5119672045",
+      "transformation": "fixed-width view configuration path value cleared"
+    },
+    {
+      "file": "libraries/0.1 - 电阻-电容-电感.SchLib",
+      "bytes": 241664,
+      "sha256": "e8920a78963dcf8dd2d7a266d20b544dbdf2773b9bb50b9e15b345d0d8721298"
+    },
+    {
+      "file": "libraries/0.3 - LED发光二极管.SchLib",
+      "bytes": 92160,
+      "sha256": "d9310fc4a342884503a40b96f5856331272fb6db09642e101f5ea2f1385e649b"
+    },
+    {
+      "file": "libraries/0.5 - 场效应管-可控硅.SchLib",
+      "bytes": 130560,
+      "sha256": "79a520eabc61941d7f3fc0f86f6dcf22402ed7d62646399c0afc51cbb809e7e7"
+    },
+    {
+      "file": "libraries/0.7 - 常用按键-开关.SchLib",
+      "bytes": 245248,
+      "sha256": "b34c11c92f83d899cab2bf170c4842ce079fe9a657400d4516ad2311110934c5"
+    },
+    {
+      "file": "libraries/0.8 - 以太网-音频-USB插座.SchLib",
+      "bytes": 179712,
+      "sha256": "04f41826703885a11d8901fd74855bcbfff98db5b47ec594abea1e4cc08b736f"
+    },
+    {
+      "file": "libraries/1.0 - 常见芯片.SchLib",
+      "bytes": 798208,
+      "sha256": "d5de9ee661d2ccb44282326c2517e0434fd4ba3c14979af0e6d5b33bbb638d25"
+    },
+    {
+      "file": "libraries/1.1 - 电源类芯片.SchLib",
+      "bytes": 192512,
+      "sha256": "be188def6d2d1943e5c8e3363227d9bafdd77151292b9fa71ad4aca3c0d1a9d1"
+    },
+    {
+      "file": "libraries/1.8 - WiFi天线-SMA射频座.SchLib",
+      "bytes": 12288,
+      "sha256": "9a1e84964da2c2e282f77a6e77383bf8809ce85cd5d6638b1a5523305338a57b"
+    },
+    {
+      "file": "libraries/7.8 - BW16.SCHLIB",
+      "bytes": 9728,
+      "sha256": "85fa727dd7250200fbaca403805e6d566748b53290f369649c420212579040ba"
+    },
+    {
+      "file": "libraries/7.9 - SSD1306.SCHLIB",
+      "bytes": 6144,
+      "sha256": "0548f73ff323f42a33b2e0f62df008737560e320de15b01d9ac9d76b73b2620b"
+    },
+    {
+      "file": "libraries/8.0 - STM32.SCHLIB",
+      "bytes": 28160,
+      "sha256": "007f5d9e6bb3b267ac5b2819f31409839e711ef58c62202a11ef596342d1d04b"
+    },
+    {
+      "file": "libraries/8.0 - 蜂鸣器.SCHLIB",
+      "bytes": 5632,
+      "sha256": "8a8e495bb34e24632b96049e3ba98a87688598c5f121bfd0e14c596d9bc859cc"
+    },
+    {
+      "file": "libraries/crabit.SCHLIB",
+      "bytes": 107008,
+      "sha256": "e1c75feab54d0adb2e9d929dfb5413200059e877ed95ce6c0d1bbdcab2eb57e3"
+    },
+    {
+      "file": "libraries/FPC.SCHLIB",
+      "bytes": 25600,
+      "sha256": "571d5d070ef75e2d7212b5a0b1978bc1812197430fba651927acf675bfccd3d7"
+    },
+    {
+      "file": "libraries/pcie.SCHLIB",
+      "bytes": 24576,
+      "sha256": "90aea4686590216f1bb58335dbac908741f9f90d3bba2576103463ad2dcfdb42"
+    },
+    {
+      "file": "libraries/WS2812.SCHLIB",
+      "bytes": 11776,
+      "sha256": "7175f3f1cfe740bd4833a4692a450efcb885060080347c23a2b2d00022a43c39"
+    },
+    {
+      "file": "libraries/烧录.SchLib",
+      "bytes": 4608,
+      "sha256": "9e2234d0427ef2e4514734b54c5cb63811d893731599d522fc54a55a66fac5a9"
+    }
+  ],
+  "relocated_reference_count": 48,
+  "removed_historical_generated_references": 22,
+  "changes": "Design/library binaries unchanged from native ZIP. Project document and embedded output-target paths relocated; 22 absent historical generated-document entries removed. Full native archive library set retained, not a minimized project library.",
+  "project_file": "Crabit_OpenHardware.PrjPcb",
+  "project_sha256": "45aa248f74395ae7fa3a23163ed1a9ad5e4c41fa8259ae5b37425b81ba005783",
+  "relocated_embedded_output_targets": 54,
+  "validation": {
+    "archive_crc": "passed",
+    "binary_copy_hashes": "passed",
+    "relative_project_references": "passed",
+    "native_reopen": "not_completed_ui_dialog_targeting_failure",
+    "native_library_compile": "not_run",
+    "clean_machine_isolation": "not_run",
+    "manufacturing_release": "not_claimed"
+  },
+  "project_hash_encoding": "UTF-8 file bytes with CRLF normalized to LF; binary file hashes remain exact",
+  "binary_content_state": "Eight display configuration path values cleared; all other stream bytes preserved."
+}

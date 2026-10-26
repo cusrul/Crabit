@@ -1,0 +1,27 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{dart,yml,yaml,json}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab
+
+# Preserve original vendor/resource bytes. These files are not formatting targets.
+[{reference/**,firmware/stm32/Drivers/**,firmware/stm32/Middlewares/**,**/vendor/**,**/assets/**}]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = false
+indent_size = unset
+indent_style = unset

@@ -1,0 +1,8 @@
+[tool.black]
+required-version = "24.4.2"
+line-length = 100
+target-version = ["py311"]
+# Multiline C++ fixtures are data; Black must not be used to rewrite their bodies.
+# Explicit migration targets live in tools/style_scope.json, not a recursive scan.
+include = '\.pyi?$'
+extend-exclude = '/(build|reference|vendor|\.ai/history)/'

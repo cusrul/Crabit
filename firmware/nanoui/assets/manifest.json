@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "description": "Canonical NanoUI asset contract; generated firmware files remain target-owned.",
+  "profiles": {
+    "stm32-watch": {
+      "asset_root": "firmware/stm32/Core/NanoUI/assets",
+      "source_roots": [
+        "firmware/stm32/Core/NanoUI/include/NanoUI",
+        "firmware/stm32/Core/NanoUI/app_real"
+      ],
+      "font_source": "firmware/stm32/Core/NanoUI/assets/fonts",
+      "budget_bytes": 65536
+    },
+    "bw16-experience": {
+      "asset_root": "firmware/rtl8720dn/NanoUI/assets",
+      "source_roots": [
+        "firmware/rtl8720dn/NanoUI/src",
+        "firmware/rtl8720dn/NanoUI/app"
+      ],
+      "font_source": "firmware/rtl8720dn/NanoUI/assets/fonts",
+      "budget_bytes": 262144
+    }
+  },
+  "fonts": [
+    {
+      "id": "latin-ui",
+      "kind": "bdf",
+      "sizes": [8, 10, 12, 16, 24],
+      "ranges": ["U+0000-U+007F"],
+      "profiles": ["stm32-watch", "bw16-experience"]
+    },
+    {
+      "id": "runtime-explicit",
+      "kind": "generated",
+      "sizes": [8, 10, 12, 16, 24],
+      "ranges": [],
+      "profiles": ["stm32-watch", "bw16-experience"],
+      "source": "source-scanner-plus-explicit-strings"
+    }
+  ],
+  "images": [],
+  "required_strings": [
+    "BLE",
+    "Wi-Fi",
+    "OTA",
+    "AXP2101",
+    "BW16"
+  ]
+}
