@@ -1,0 +1,15 @@
+Crabit Windows preview
+
+This installer includes the application, DLLs, NanoUI preview resources and third-party notices. It installs for the current Windows user and does not change device firmware.
+
+System prerequisites (not bundled):
+- Microsoft Edge WebView2 Evergreen Runtime: https://developer.microsoft.com/microsoft-edge/webview2/
+- Microsoft Visual C++ 2015-2022 Redistributable x64: https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist
+
+If the application cannot start or its 3D view is unavailable, check these prerequisites. The installer does not download or install them silently.
+
+The installer is unsigned; Windows may display an unknown-publisher warning. This is a preview, not a stable release. Existing user scripts and settings are not intentionally removed by uninstalling this package. Back up important data before upgrades.
+
+FlutterBluePlus and other dependencies retain their own terms. See the installed LICENSE, LICENSING.md and THIRD_PARTY_NOTICES.md. No additional commercial plugin grant is implied.
+
+Installer built with Inno Setup (https://jrsoftware.org/).

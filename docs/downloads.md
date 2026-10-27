@@ -4,6 +4,8 @@
 
 ## 发布包
 
+Windows 安装器构建入口为 `tools/build-windows-installer.ps1`，可将完整运行目录打包成单个 `Crabit-Setup-…-x64.exe`。安装器采用当前用户安装，包含 DLL 与资源；WebView2 和 VC++ 运行库仍是系统前置条件，不会静默安装。安装包未签名，Windows 可能提示未知发布者。以 Release 实际附件为准，不能将尚未上传的本地构建当作已有下载。
+
 | 文件 | 内容与适用范围 |
 | --- | --- |
 | `Crabit-STM32-v0.2.0-preview.1.zip` | STM32L432CBU6（256 KiB）的 ELF 与 BIN；BIN 烧录地址为 `0x08000000`。 |

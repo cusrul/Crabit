@@ -15,7 +15,7 @@
     <!-- ============================================ -->
 
     <application
-        android:label="crabit_watch_app"
+        android:label="Crabit"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

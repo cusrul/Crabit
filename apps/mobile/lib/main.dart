@@ -31,7 +31,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Crabit Watch',
+      title: 'Crabit',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: home ?? const HomePage(),
