@@ -37,7 +37,7 @@ CRC、请求编号、配对认证、SDK 无线状态和页面提示也各自解�
 App 状态、控件树和 RenderObject 的寿命需要协调，但不应由应用层重新实现一套布局引擎。
 
 当前两端产品的兼容头会转发到同一份维护中的原框架。Arduino 安装的 ZIP 是该库的分发副本，不是第二份权威源码。
-`experimental/` 下保留的其他实现不属于默认产品核心；嵌套旧框架和备份树已从当前源码树移除，恢复基线见收敛记录。
+`experimental/` 下保留的其他实现不属于默认产品核心；嵌套旧框架和备份树已从当前源码树移除，历史内容可从 Git 恢复。
 资源按 App 扫描和生成，不把两个相似字体子集合成公共的万能字库。见[NanoUI](nanoui.md)与[资源工具](assets.md)。
 
 ### 名字相近的 App 目录
@@ -46,10 +46,11 @@ App 状态、控件树和 RenderObject 的寿命需要协调，但不应由应�
 | --- | --- | --- |
 | STM32 `Core/NanoUI/app_real/` | 默认嵌入式产品 App；由当前 CMake 接入 | 产品维护入口 |
 | STM32 `Core/NanoUI/app_desktop/` | 原桌面模拟器及布局观察工具 | 不是无用备份，保留独立资源配置 |
-| STM32 `Core/NanoUI/app_new/` | 旧 `CMakeLists_STM32.txt` 替代接入方案引用 | 非默认入口，不自动删除或恢复为默认 |
 | BW16 `NanoUI/app/` | 当前 Arduino 产品 App | 产品维护入口 |
 | BW16 `NanoUI/app_example/` | 示例资源配置和工具可选扫描范围 | 不混入默认产品字库；保留示例用途 |
 | `libraries/NanoUI/examples/` | 独立框架接入示例 | 不依赖 Crabit 的硬件 App |
+
+未参与当前构建的 STM32 `usb_hid/`、`usb_hid_new/`，以及旧 `CMakeLists_STM32.txt`、`Core/NanoUI/app_new/` 和同层旧 `examples/` 已退役，历史内容可从 Git 恢复。当前 USB 实现位于 `USB_DEVICE/App`、`Target` 和 `Composite`；不要删除 ST 中间件的 CustomHID 类。
 
 字体输入、生成资源与共享 UI 核心是三件事。已有生成器仍按各产品配置扫描 App，
 不能因为目录或字库看起来相似就合并生成输出；当前整理也不迁移模型或输入字体。
