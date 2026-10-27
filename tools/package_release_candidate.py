@@ -75,7 +75,18 @@ def _safe_relative(value: str, label: str) -> PurePosixPath:
         _fail(f"Absolute {label} is not allowed: {value}")
     if any(part in ("", ".", "..") for part in normalized.split("/")):
         _fail(f"Unsafe {label}: {value}")
-    if any(part.casefold() in EXCLUDED_PARTS for part in path.parts):
+    # Flutter Scene ships a shader bundle under a literal build/ asset path.
+    # This is runtime data, not the application's build directory or a cache.
+    runtime_shader = (
+        tuple(part.casefold() for part in path.parts[:7])
+        == ("windows", "data", "flutter_assets", "packages", "flutter_scene", "build", "shaderbundles")
+        and len(path.parts) == 8
+        and path.suffix.casefold() == ".shaderbundle"
+    )
+    if any(
+        part.casefold() in EXCLUDED_PARTS and not (runtime_shader and index == 5)
+        for index, part in enumerate(path.parts)
+    ):
         _fail(f"Excluded/private path in {label}: {value}")
     if (
         path.name.casefold() in EXCLUDED_NAMES

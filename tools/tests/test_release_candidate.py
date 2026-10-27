@@ -154,6 +154,18 @@ class ReleaseCandidateTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertTrue(_is_local_auth_header(name))
 
+    def test_flutter_scene_runtime_shader_build_path_is_not_a_cache(self):
+        shader = self.artifacts_dir / "base.shaderbundle"
+        shader.write_bytes(b"runtime shader fixture")
+        item = {
+            **self.artifact, "kind": "windows-release-file", "source_path": str(shader),
+            "target": "windows/data/flutter_assets/packages/flutter_scene/build/shaderbundles/base.shaderbundle",
+            "sha256": self._hash(shader),
+        }
+        self._inputs([item])
+        self._package()
+        self.assertEqual((self.output / item["target"]).read_bytes(), shader.read_bytes())
+
     def test_compile_only_bw16_requires_compile_checks_and_marker(self):
         image_dir = self.artifacts_dir / "bw16"
         image_dir.mkdir()
