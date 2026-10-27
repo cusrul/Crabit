@@ -34,7 +34,7 @@ flutter run -d windows -t build/tutorial-flutter/main.dart
 
 窗口内顶部标题是 `My first page`，不是要求Windows外框标题相同。页面显示 `Current value`、`Value: 0` 和 `Add one` 按钮。点击后变成 `Value: 1`，再点变成 `Value: 2`。关闭窗口结束运行。桌面工具链缺失时Flutter会报错，与手表连接无关。
 
-![独立Flutter页面：按一次Add one后显示Value 1](/media/crabit/flutter-first-page.png)
+![独立Flutter页面：按一次Add one后显示Value 1](../media/ui/flutter-first-page.png)
 
 *完整示例的实际Widget测试渲染，模拟了一次按钮点击；不连接手表。*
 

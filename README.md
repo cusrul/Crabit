@@ -22,13 +22,11 @@
 STM32L432 负责设备控制、低功耗、传感器和 USB；BW16 / RTL8720DN 负责无线。
 OLED 使用 NanoUI，客户端支持 Android 与 Windows，并带有可操作的 3D 手表预览。
 
-<details>
-<summary>看看 Flutter 客户端</summary>
+## Flutter 客户端
 
-![Flutter 客户端的设备连接与状态界面](showcase/media/ui/connection-ready.webp)
+![Flutter 客户端完整首页：3D 手表、连接状态与功能入口](showcase/media/ui/flutter-home.png)
 
-界面示例用于说明操作位置，不代表本次连接了真实设备。
-</details>
+已有客户端首页截图；界面与连接状态用于展示，不代表当前连接了真实设备。
 
 ## 从哪里开始
 

@@ -66,7 +66,7 @@ imu=...;opt=...;bmp=压力,温度;bat=...;at=...;age=...
 - `ReportedTemperature.parse()`：纯数据解析，拒绝缺字段、重复字段、非法数字。
 - `TutorialTemperatureCard`：订阅已有 `DeviceCenterController`，读取快照并显示状态。
 
-![新卡片的实际Flutter测试渲染，明确标注模拟数据](/media/crabit/sensor-project.png)
+![新卡片的实际Flutter测试渲染，明确标注模拟数据](../media/ui/sensor-project.png)
 
 *本章组件与现有App主题的真实渲染，数据来自FakeDeviceLink；不是手表实测。*
 

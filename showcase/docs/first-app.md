@@ -104,7 +104,7 @@ return new Column({
 
 保存、编译、运行。预期：多出Hello，开关下移，仍能用Enter操作。完整结果也保存在 `showcase/examples/first-steps/hello_app.h`，遇到语法错误可用它对照。
 
-![本章三行界面的实际无窗口输出](/media/crabit/first-app-hello.png)
+![本章三行界面的实际无窗口输出](../media/ui/first-app-hello.png)
 
 *实际C++像素放大显示；无窗口检查已模拟一次Enter，不是手表照片。*
 

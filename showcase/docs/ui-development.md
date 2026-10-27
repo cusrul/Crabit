@@ -61,7 +61,7 @@ $exe = Get-ChildItem build/first-app -Recurse -Filter NanoUIFirstApp.exe |
 
 无窗口检查可运行 `& $exe --headless build/first-app/panel.bmp`，预期打印 `switch=on`。它只确认第一个开关接收了一次确认事件，不能替代对第二个开关和视觉布局的检查。
 
-![双开关示例的实际128×64无窗口输出](/media/crabit/tutorial-panel.png)
+![双开关示例的实际128×64无窗口输出](../media/ui/tutorial-panel.png)
 
 *示例实际构建输出，已模拟一次Enter；像素图不是手表实拍。*
 

@@ -28,7 +28,7 @@ description: 设备、设置、脚本、时间天气与模型的使用顺序。
 实际按钮是“刷新偏好”和“应用并保存偏好”：先刷新，改一项，再应用；等结果返回后重新刷新确认值仍然一致。
 按钮不可点时先检查通信是否已验证、请求是否仍在处理中；不要反复点击来叠加请求。
 
-![Flutter 设置 Widget，模拟参数](/media/crabit/flutter-settings.webp)
+![Flutter 设置 Widget，模拟参数](../media/ui/flutter-settings.webp)
 
 *界面示例，参数为模拟数据。*
 
@@ -51,7 +51,7 @@ USB 模式切换与首次接线的照片待补，不在这里猜按键路径。
 
 脚本工作台把编辑器与本地动作片段放在一起。“载入编辑器”追加内容并自动换行，可重复组合；保存草稿可以形成新片段或完整脚本。
 
-![Flutter 脚本工作台，未连接设备](/media/crabit/flutter-scripts.webp)
+![Flutter 脚本工作台，未连接设备](../media/ui/flutter-scripts.webp)
 
 *界面示例，参数为模拟数据。*
 例如只输入无害文本：
@@ -96,15 +96,15 @@ Flutter预览优先使用App中已配置城市与有效天气缓存，没有配�
 
 电池、手表温度及其他模拟传感器仍是演示值，不能把模型中的这些读数当作真机状态。要同步真实手表的时间天气，仍需按本页“时间与天气”的BLE操作完成确认。本文的静态操作截图不实时变化。
 
-![3D 手表模型中的 NanoUI 菜单模拟画面](/media/crabit/watch-menu.webp)
+![3D 手表模型中的 NanoUI 菜单模拟画面](../media/ui/watch-menu.webp)
 
 *界面示例，参数为模拟数据。*
 
-![3D 手表模型中的 NanoUI 传感器页面模拟画面](/media/crabit/watch-sensors.webp)
+![3D 手表模型中的 NanoUI 传感器页面模拟画面](../media/ui/watch-sensors.webp)
 
 *界面示例，参数为模拟数据。*
 
-![3D 手表模型中的 NanoUI 系统设置模拟画面](/media/crabit/watch-settings.webp)
+![3D 手表模型中的 NanoUI 系统设置模拟画面](../media/ui/watch-settings.webp)
 
 *界面示例，参数为模拟数据。*
 
@@ -112,7 +112,7 @@ Flutter预览优先使用App中已配置城市与有效天气缓存，没有配�
 
 电池历史页面展示客户端保存的连接期间样本，不是全天连续记录；断开期间没有数据，不能据此推算续航。
 
-![Flutter 电池历史 Widget，模拟参数](/media/crabit/flutter-battery.webp)
+![Flutter 电池历史 Widget，模拟参数](../media/ui/flutter-battery.webp)
 
 *界面示例，参数为模拟数据。*
 

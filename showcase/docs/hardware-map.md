@@ -5,7 +5,7 @@ description: 对照维护者提供的 AD 原理图和 PCB 视图，区分正在�
 
 这张图用于认识 Crabit，不是接线图或制造文件。底图来自维护者提供的 Altium Designer 工程视图；器件位置和位号按本次提供的 `1432.SchDoc`、`nrf8720dn.SchDoc` 与 `Crabit_V2.PcbDoc` 截图对照。尚未取得可发布的完整工程、BOM 或制造输出，不应仅凭图片投板。
 
-![Crabit 硬件分工：STM32、RTL8720DN、QMI8658A、BMP280、PAT9125、AXP2101 与 USB-C](/media/crabit/hardware-components.png)
+![Crabit 硬件分工：STM32、RTL8720DN、QMI8658A、BMP280、PAT9125、AXP2101 与 USB-C](../media/hardware/hardware-components.png)
 
 ## 先认识两颗处理器
 
