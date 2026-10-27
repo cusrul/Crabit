@@ -4,6 +4,9 @@ Project-owned original contributions in Crabit are licensed under the GNU Genera
 Public License, version 3 only (`GPL-3.0-only`), unless a file or component carries
 a different applicable notice. The full license is in [LICENSE](LICENSE).
 Commercial use, modification and redistribution are permitted subject to its terms.
+Project-owned contributions also carry the limited additional permission in
+[LICENSE-EXCEPTIONS.md](LICENSE-EXCEPTIONS.md) for combination with the bundled
+ST USB Device Library. The unmodified GPLv3 text remains in `LICENSE`.
 
 For software, the preferred source includes the maintained source files, build
 scripts and configuration needed to build it. For original hardware designs, it
@@ -20,12 +23,14 @@ copyright and license notices. This project's GPL grant does not replace them or
 assert that every combination is compatible. See
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-In particular, the bundled ST USB Device Library's LICENSE points to package-level
-terms, or otherwise SLA0044 Rev6. Its fallback terms include an ST-device restriction
-and a restriction on subjecting that software to open-source terms. The applicable
-package grant and compatibility of a linked GPL firmware distribution have not yet
-been established. Simply keeping separate license files does not resolve a linking
-conflict. No additional linking exception or alternative SDK license is granted here.
+The bundled ST USB Device Library's LICENSE points to package-level terms, or
+otherwise SLA0044 Rev6. Its fallback terms include an ST-device restriction and a
+restriction on subjecting that software to open-source terms. Crabit's copyright
+holders expressly permit linking their own covered contributions with this library
+under the limited exception above. ST's terms and files are unchanged; use the
+combination only as permitted by both grants. This resolves the project-owned
+GPL linking restriction, not the ownership or licensing of unrelated third-party
+inputs. No alternative SDK license or universal distribution clearance is claimed.
 
 Redistribution permissions for the collected hardware libraries and some other
 third-party inputs also remain under review. Adding the project license is not a

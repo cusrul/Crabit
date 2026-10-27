@@ -1,7 +1,8 @@
 # NanoUI
 
-Original NanoUI contributions in this repository are licensed under
-GPL-3.0-only; see LICENSE. Third-party font and asset notices remain applicable.
+Original NanoUI contributions in this repository are licensed under GPL-3.0-only
+with the limited ST USB linking permission in `LICENSE-EXCEPTIONS.md`; see LICENSE.
+Third-party font and asset notices remain applicable. ST code is not relicensed.
 
 NanoUI is a small C++ UI framework for embedded displays and host previews. It
 lets an application describe a widget tree once, while a platform supplies the
@@ -19,7 +20,7 @@ FirstApp, tools, integrations and `docs/runtime-contracts.md` are included in th
 locally generated Arduino ZIP. Links into `../../docs/` refer to the full Crabit
 repository, not files bundled in that standalone ZIP. Packaging locally is not
 a license or public redistribution approval; see the repository's
-release checklist.
+[release checklist](../../docs/release-candidate.md).
 
 ## A small App
 
@@ -74,7 +75,7 @@ Use `#include <NanoUI.h>` for new Apps. Existing Crabit Apps can keep their
 legacy include paths through forwarding headers; there is no need for a bulk
 migration. `NanoUILegacy.h` is a compatibility entry, not the recommended new
 App interface. The details and limits are in the
-portable library contract.
+The maintained public entry is `NanoUI.h`; legacy wrappers remain compatibility entries.
 
 ## Try FirstApp on Windows
 
@@ -133,7 +134,7 @@ you are entitled to use; this repository makes no blanket licensing promise.
 
 For storage backends, borrowed App/text lifetimes, object callback limits and
 terminal cleanup order, see the retained [runtime contracts](docs/runtime-contracts.md).
-Layout semantics are in the layout contract.
+Layout semantics are exercised by the library's maintained tests.
 
 The independent host test build uses CMake and a C++11 compiler:
 

@@ -17,6 +17,10 @@ class BuildReproductionTests(unittest.TestCase):
         self.assertIn("GNU GENERAL PUBLIC LICENSE", root_license)
         script = (ROOT / "tools/package-nanoui-arduino.ps1").read_text(encoding="utf-8-sig")
         self.assertIn('foreach ($entry in @("LICENSE",', script)
+        self.assertIn('Join-Path $repoRoot "LICENSE-EXCEPTIONS.md"', script)
+        exception = (ROOT / "LICENSE-EXCEPTIONS.md").read_text(encoding="utf-8")
+        self.assertIn("section 7", exception)
+        self.assertIn("third-party", exception)
 
     def test_bundled_dependency_is_selected(self):
         script = (ROOT / "tools/build-rtl8720dn.ps1").read_text(encoding="utf-8-sig")

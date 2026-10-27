@@ -14,6 +14,7 @@ New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 try {
     Copy-Item -LiteralPath (Join-Path $library "library.properties") -Destination $packageRoot
     Copy-Item -LiteralPath (Join-Path $library "src") -Destination $packageRoot -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE-EXCEPTIONS.md") -Destination $packageRoot
     foreach ($entry in @("LICENSE", "README.md", "CMakeLists.txt", "assets", "tests", "integrations", "docs")) {
         $source = Join-Path $library $entry
         if (Test-Path -LiteralPath $source) {
