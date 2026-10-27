@@ -4,6 +4,7 @@
 
 ## 使用
 
+- [下载与安装](downloads.md)
 - [快速使用](../showcase/docs/start.md)
 - [连接 App](../showcase/docs/connect.md)
 - [客户端操作](../showcase/docs/app-guide.md)

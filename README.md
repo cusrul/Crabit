@@ -8,6 +8,8 @@
 
 [下载固件与 App](https://github.com/cusrul/Crabit/releases) · [图文文档](https://zzoo.asia/docs/crabit/) · [快速上手](showcase/docs/start.md)
 
+安装、适用硬件与公开初始验证码见[预览版下载说明](docs/downloads.md)。
+
 ## 可以做什么
 
 - **日常使用**：多款表盘、时间与天气、蓝牙状态、运动唤醒与 STOP2 休眠。
