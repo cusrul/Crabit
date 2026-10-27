@@ -49,8 +49,10 @@ def _fail(message: str) -> None:
 
 def _is_local_auth_header(name: str) -> bool:
     folded = name.casefold()
-    return folded.endswith(".h") and (
-        folded.startswith("ble_auth") or ("auth" in folded and ".local." in folded)
+    if name == "ble_auth.local.example.h":
+        return False
+    return (folded.startswith("ble_auth") and ".h" in folded) or (
+        "auth" in folded and ".local." in folded and ".h" in folded
     )
 
 

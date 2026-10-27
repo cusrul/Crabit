@@ -8,7 +8,7 @@ import tempfile
 import unittest
 import zipfile
 
-from tools.package_release_candidate import package_candidate
+from tools.package_release_candidate import _is_local_auth_header, package_candidate
 
 
 class ReleaseCandidateTests(unittest.TestCase):
@@ -26,7 +26,11 @@ class ReleaseCandidateTests(unittest.TestCase):
         (self.repo / "AGENTS.md").write_text("must not enter archive\n", encoding="utf-8")
         (self.repo / ".ai").mkdir()
         (self.repo / ".ai" / "work.md").write_text("internal\n", encoding="utf-8")
-        self._git("add", "README.md", "LICENSE", "AGENTS.md", ".ai/work.md")
+        (self.repo / "firmware/NanoUI").mkdir(parents=True)
+        (self.repo / "firmware/NanoUI/ble_auth.local.example.h").write_text(
+            "public placeholder template\n", encoding="ascii",
+        )
+        self._git("add", "README.md", "LICENSE", "AGENTS.md", ".ai/work.md", "firmware/NanoUI/ble_auth.local.example.h")
         self._git("commit", "-qm", "fixture handoff")
         self.sha = self._git("rev-parse", "HEAD")
         self.artifacts_dir = self.root / "artifacts"
@@ -83,6 +87,7 @@ class ReleaseCandidateTests(unittest.TestCase):
         with zipfile.ZipFile(self.output / "source/source.zip") as archive:
             names = archive.namelist()
             self.assertIn("LICENSE", names)
+            self.assertIn("firmware/NanoUI/ble_auth.local.example.h", names)
             self.assertNotIn("AGENTS.md", names)
             self.assertNotIn(".ai/work.md", names)
         self.assertTrue((self.output / "licenses/source/LICENSE").is_file())
@@ -128,7 +133,6 @@ class ReleaseCandidateTests(unittest.TestCase):
 
     def test_tracked_auth_header_is_refused_before_archive(self):
         header = self.repo / "firmware/NanoUI/ble_auth.local.h"
-        header.parent.mkdir(parents=True)
         header.write_text("must not be read\n", encoding="ascii")
         self._git("add", "firmware/NanoUI/ble_auth.local.h")
         self._git("commit", "-qm", "fixture local auth header")
@@ -137,6 +141,18 @@ class ReleaseCandidateTests(unittest.TestCase):
         self._inputs([self.artifact])
         with self.assertRaisesRegex(ValueError, "tracks a local BLE auth header"):
             self._package()
+
+    def test_auth_header_classifier_allows_only_exact_template_name(self):
+        self.assertFalse(_is_local_auth_header("ble_auth.local.example.h"))
+        for name in (
+            "ble_auth.local.h",
+            "BLE_AUTH.local.example.h",
+            "ble_auth.local.h.example",
+            "ble_auth.local.example.h.bak",
+            "watch_auth.local.h.txt",
+        ):
+            with self.subTest(name=name):
+                self.assertTrue(_is_local_auth_header(name))
 
     def test_compile_only_bw16_requires_compile_checks_and_marker(self):
         image_dir = self.artifacts_dir / "bw16"

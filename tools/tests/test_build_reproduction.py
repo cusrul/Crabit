@@ -10,6 +10,19 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class BuildReproductionTests(unittest.TestCase):
+    def test_third_party_licenses_are_not_replaced_by_project_gpl(self):
+        st_license = (ROOT / "firmware/stm32/Middlewares/ST/STM32_USB_Device_Library/LICENSE.txt").read_text(encoding="utf-8-sig")
+        self.assertIn("SLA0044 Rev6/October 2025", st_license)
+        self.assertIn("exclusively on or in combination", st_license)
+        for relative, owner in (
+            ("app/castle_boy/LICENSE", "2016 dir3kt"),
+            ("app/arduboy3d/LICENSE", "James Howard"),
+            ("app/LICENSE-Hopper.txt", "OBONO"),
+        ):
+            text = (ROOT / "firmware/rtl8720dn/NanoUI" / relative).read_text(encoding="utf-8")
+            self.assertIn(owner, text)
+            self.assertIn("Permission is hereby granted", text)
+
     def test_original_license_is_packaged(self):
         root_license = (ROOT / "LICENSE").read_text(encoding="utf-8-sig")
         library_license = (ROOT / "libraries/NanoUI/LICENSE").read_text(encoding="utf-8-sig")
