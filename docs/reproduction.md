@@ -117,6 +117,7 @@ Arduino IDE用户另运行 `tools/package-nanoui-arduino.ps1` 生成NanoUI ZIP�
 | native NanoUI模拟器 | 同上 | VS2022 Debug构建、1项测试通过 |
 | STM32 MinSizeRel | 同上 | 全新构建通过；Flash 200752B，主RAM 56608B |
 | Flutter | 同上 | analyze通过；202项测试通过、1项条件跳过、0失败；Windows Release构建通过，首屏与3D手表实际显示 |
+| Android APK | fe8937d3611264101a4fcbd8c5af081be534bf27 | 独立克隆、锁定依赖安装和 Release 编译通过；使用原配置的 Android Debug 证书，未做手机安装验收 |
 | BW16仓库内依赖 | f29bfe246f13cbf5dbb93250f5705265736f077d | 再次全新克隆后构建和镜像检查通过 |
 | NanoUI Arduino ZIP | 同上 | 打包通过，确认包含LICENSE |
 
@@ -128,7 +129,13 @@ BW16本次使用未填入真实设备码的模板，只作编译验证，产物�
 SHA256：`59a157a1a2f3a07a82878143c15d5f8ea1eb208642dac2c68e1cea6a3833c6db`。
 使用仓库内库与原外部库时的打包镜像哈希一致。
 
-未做：新机器完整安装、Linux/macOS/Android/iOS构建、真实BLE连接、USB实机、烧录及整机回归。
+Android 补验：Flutter 3.41.6 / Dart 3.11.4、OpenJDK 17.0.11、Gradle 8.11.1、
+AGP 8.9.1、Android platform 36、build-tools 36.1.0。APK SHA256 为
+`5d255e603362af138f4f03f386e8ca065d5cd1cca2e0c74486ef7ef241bd5f14`。
+当前 Gradle 的 release 使用 debug signingConfig；这不是正式签名，不能承诺
+以后换成正式证书时可直接覆盖安装。构建期间没有手动接受 SDK 许可或修改签名配置。
+
+未做：新机器完整安装、Linux/macOS/iOS构建、Android真机安装、真实BLE连接、USB实机、烧录及整机回归。
 编译通过不等于第三方许可全部清理完成。项目原创部分已增加限定的
 [ST USB链接许可](../LICENSE-EXCEPTIONS.md)，ST文件及其条款不变；
 客户端FlutterBluePlus的商业条件及其他素材范围仍见[第三方声明](../THIRD_PARTY_NOTICES.md)。
