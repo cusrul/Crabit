@@ -1,7 +1,30 @@
 # Crabit
 
-一块可以自己修改软硬件的 STM32L432 + BW16 双芯片手表，配有 Flutter 客户端。
-NanoUI 使用 C++ Widget 组合界面，STM32、BW16 和 Windows 共用框架核心。
+一块可以自己修改软硬件的双芯片手表：看时间、读取传感器、运行小游戏，也可以写自己的界面和工具。
+
+<p align="center">
+  <img src="showcase/media/product-overview.png" width="760" alt="Crabit 手表实物：橙色表带、OLED 界面及拆开的电路板与电池">
+</p>
+
+[下载固件与 App](https://github.com/cusrul/Crabit/releases) · [图文文档](https://zzoo.asia/docs/crabit/) · [快速上手](showcase/docs/start.md)
+
+## 可以做什么
+
+- **日常使用**：多款表盘、时间与天气、蓝牙状态、运动唤醒与 STOP2 休眠。
+- **传感器与交互**：六轴惯性、气压/温度、光学滑动输入、按键、蜂鸣器和 RGB 彩灯。
+- **无线与 USB 工具**：Wi-Fi / BLE 测试、USB 串口与键盘脚本；仅在自己的设备或取得授权的环境中使用。
+- **自己开发**：原理图、PCB、双端固件、NanoUI 与 Flutter 客户端都在仓库里。先在 Windows 预览界面，再接入真实手表。
+
+STM32L432 负责设备控制、低功耗、传感器和 USB；BW16 / RTL8720DN 负责无线。
+OLED 使用 NanoUI，客户端支持 Android 与 Windows，并带有可操作的 3D 手表预览。
+
+<details>
+<summary>看看 Flutter 客户端</summary>
+
+![Flutter 客户端的设备连接与状态界面](showcase/media/ui/connection-ready.webp)
+
+界面示例用于说明操作位置，不代表本次连接了真实设备。
+</details>
 
 ## 从哪里开始
 
@@ -31,5 +54,5 @@ NanoUI 使用 C++ Widget 组合界面，STM32、BW16 和 Windows 共用框架核
 ## 授权
 
 本项目有权授权的原创内容采用 **GPL-3.0-only**，允许遵守条款的商业使用、修改和分发。
-适用范围及尚未解决的第三方组合限制见[授权说明](LICENSING.md)。
-第三方代码、字体、模型和硬件库保留原授权，不统一改标，见[第三方来源](THIRD_PARTY_NOTICES.md)。
+适用范围及第三方组合限制见[授权说明](LICENSING.md)。
+第三方代码、字体、模型和硬件库保留原授权，见[第三方来源](THIRD_PARTY_NOTICES.md)。
