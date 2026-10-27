@@ -8,6 +8,8 @@ Windows 安装器构建入口为 `tools/build-windows-installer.ps1`，可将完
 
 | 文件 | 内容与适用范围 |
 | --- | --- |
+| [Crabit Windows 安装包](https://github.com/cusrul/Crabit/releases/download/v0.2.0-preview.1/Crabit-Setup-0.2.0-preview.1-x64.exe) | 新图标与名称版；包含 DLL/资源，当前用户安装。未签名，WebView2/VC++ 仍需本机具备。 |
+| [Crabit Android APK（新图标版）](https://github.com/cusrul/Crabit/releases/download/v0.2.0-preview.1/Crabit-Android-0.2.0-preview.1-branded-debug-signed.apk) | 显示名称 Crabit，保留原包名与 Debug 签名；尚无手机安装验收。 |
 | `Crabit-STM32-v0.2.0-preview.1.zip` | STM32L432CBU6（256 KiB）的 ELF 与 BIN；BIN 烧录地址为 `0x08000000`。 |
 | `Crabit-BW16-v0.2.0-preview.1.zip` | BW16 应用 packed image，镜像起点为 `0x6000`，不是 `0`。只用于已有兼容 bootloader 的设备；不含 bootloader，也不用于空白设备的完整量产烧录。 |
 | `Crabit-Windows-x64-v0.2.0-preview.1.zip` | Windows x64 客户端完整目录；需要本机已安装 WebView2 Runtime，包内不附带 Runtime。解压后运行包内应用，不要只取出 EXE。 |
