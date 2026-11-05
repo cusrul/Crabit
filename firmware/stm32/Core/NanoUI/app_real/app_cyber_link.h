@@ -222,10 +222,13 @@ private:
                 bat = (int)bdata->percent;
                 if (bat > 100) bat = 100; else if (bat < 0) bat = 0;
             }
-            char val_buf[64];
-            snprintf(val_buf, sizeof(val_buf), "%d,%d,%d|%d,%d,%d|%d|%d",
+            const float brightness = sys_cfg.brightness >= 0.0f && sys_cfg.brightness <= 1.0f
+                ? sys_cfg.brightness : 0.5f;
+            char val_buf[80];
+            snprintf(val_buf, sizeof(val_buf), "%d,%d,%d|%d,%d,%d|%d|%d|%d|%d",
                      (int)(ax*100), (int)(ay*100), (int)(az*100),
-                     accum_dx, accum_dy, lift, bat, tx_mask);
+                     accum_dx, accum_dy, lift, bat, tx_mask,
+                     (int)(brightness * 255.0f), brightness < 0.15f ? 1 : 0);
             EventBus::publish("sns/all", val_buf);
             accum_dx = 0;
             accum_dy = 0;

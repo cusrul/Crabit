@@ -29,6 +29,7 @@ CASES = (
     "reset_reinit",
     "led_rearm",
     "diag_fragments",
+    "diag_wake",
     "diag_malformed",
     "diag_overflow",
     "diag_type_busy",
@@ -234,9 +235,9 @@ class STM32UsbSourceGuards(unittest.TestCase):
         self.assertLess(body.index("CrabitUsb_KeyboardSuspend();"), body.index("USBD_LL_Suspend("))
 
     def test_protected_hardware_headers_remain_at_recovery_snapshot(self):
-        # Captured while Lead confirmed these protected files were unchanged.
+        # Captured from the verified recovery snapshot.
         # Normalize checkout newlines and UTF-8 BOM. This pins subsequent changes; historical
-        # Git comparison remains Lead-owned and is not performed by this test.
+        # Git comparison is performed when updating these fingerprints, not at runtime.
         snapshots = {
             "Core/NanoUI/app_real/app_coproc.h": "fb9fda2bd05066ac8031202c586d706ea288b812dede3fdb839fc1bdf5369a06",
         }
@@ -247,9 +248,6 @@ class STM32UsbSourceGuards(unittest.TestCase):
         # The later verified UI localization changed labels/layout, not bridge
         # lifetime. Protect the actual non-render callbacks rather than old UI text.
         relative = "firmware/stm32/Core/NanoUI/app_real/app_bw16_flash.h"
-        baseline = subprocess.check_output(["git", "show", f"9ccef62:{relative}"], cwd=ROOT).decode(
-            "utf-8-sig"
-        )
         current = (ROOT / relative).read_text(encoding="utf-8-sig")
 
         def logic(text):
@@ -258,9 +256,17 @@ class STM32UsbSourceGuards(unittest.TestCase):
                 r"\s+", "", text.replace('"READY"', '"就绪"').replace('"Ready"', '"就绪"')
             )
 
-        for signature in ("void onCreate()", "void onDestroy()", "void onTick()"):
+        # Hashes of the same normalized callbacks from 9ccef62. A public clone
+        # need not contain private development history to run this guard.
+        callback_hashes = {
+            "void onCreate()": "ba379d6202c1407b3e460408abe01d5a88617012accf0ec468ddb1e32b14e9e3",
+            "void onDestroy()": "2c7e527c23f511bef3ea2dda02c277fe806ee89bc8922da8bf70f83f1adbd3ab",
+            "void onTick()": "18120e5f98a56fad9ba49c17ed576e1f8cc9a4d59be67f220b5d71db1406c191",
+        }
+        for signature, expected in callback_hashes.items():
             self.assertEqual(
-                logic(_function(current, signature)), logic(_function(baseline, signature))
+                hashlib.sha256(logic(_function(current, signature)).encode("utf-8")).hexdigest(),
+                expected,
             )
         self.assertEqual(current.count("BW16_Dedicated_Bridge();"), 2)  # declaration + UI action
         helper = _function(

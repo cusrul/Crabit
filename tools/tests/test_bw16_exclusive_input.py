@@ -31,6 +31,7 @@ class ExclusiveInputTests(unittest.TestCase):
 #include <deque>
 #include <stdexcept>
 using String=std::string;
+uint32_t hal_get_ticks(){return 123;}
 struct Queue {unsigned count,size;std::deque<std::vector<uint8_t>> items;};
 using QueueHandle_t=Queue*;
 constexpr int pdTRUE=1;
@@ -44,6 +45,10 @@ struct InputDriver{virtual void init()=0;virtual UIEvent poll()=0;};
             + no_includes((FW / "AmebaStore.h").read_text(encoding="utf-8"))
             + r"""
 float AmebaStore::imu_ax=0,AmebaStore::imu_ay=0,AmebaStore::imu_az=0;
+uint32_t AmebaStore::imu_updated_at=0;
+bool AmebaStore::imu_received=false;
+int AmebaStore::display_contrast=-1;
+bool AmebaStore::display_dim=false;
 int AmebaStore::opt_dx=0,AmebaStore::opt_dy=0,AmebaStore::battery_pct=0,AmebaStore::current_ui_event=0;
 bool AmebaStore::opt_lifted=false;uint8_t AmebaStore::raw_btn_mask=0;
 QueueHandle_t AmebaStore::ui_event_queue=nullptr;
@@ -109,6 +114,15 @@ int main(){
  feed("sns/all","0,0,0|0,0,0|70|0");feed("sns/all","0,0,0|0,0,0|70|1");
  feed("sns/all","0,0,0|0,0,0|70|0");feed("sns/all","0,0,0|0,0,0|70|16");
  assert(input.poll().type==EVT_UP);assert(input.poll().type==EVT_OK);assert(input.poll().type==EVT_NONE);
+ assert(AmebaStore::display_contrast==-1);
+ feed("sns/all","0,0,100|0,0,0|70|0|25|1");input.poll();
+ assert(AmebaStore::display_contrast==25 && AmebaStore::display_dim);
+ feed("sns/all","0,0,100|0,0,0|70|0");input.poll();
+ assert(AmebaStore::display_contrast==25 && AmebaStore::display_dim);
+ feed("sns/all","0,0,100|0,0,0|70|0|256|0");input.poll();
+ assert(AmebaStore::display_contrast==25 && AmebaStore::display_dim);
+ feed("sns/all","0,0,100|0,0,0|70|0|128|0");input.poll();
+ assert(AmebaStore::display_contrast==128 && !AmebaStore::display_dim);
 }
 """
         )

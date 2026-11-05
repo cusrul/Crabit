@@ -25,6 +25,7 @@ CPP_FIXTURES = (
     "i2c_recovery_test.cpp",
     "aux_stop2_test.cpp",
     "qmi_wake_trace_test.cpp",
+    "wake_history_test.cpp",
     "qmi_run_profile_test.cpp",
     "qmi_run_probe_test.cpp",
     "sensor_stop2_test.cpp",

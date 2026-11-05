@@ -1,7 +1,7 @@
 {
   "id": "crabit",
   "title": "Crabit",
-  "tagline": "戴在手上的极客小玩具",
+  "tagline": "软硬件开源、可以自己编程的手表",
   "priceCny": 120,
   "status": "现货 · 单一配置",
   "includes": ["手表本体", "电池", "表带"],

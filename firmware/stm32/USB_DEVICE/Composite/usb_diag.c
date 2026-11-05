@@ -3,6 +3,9 @@
 #include "usbd_cdc_if.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+
+extern uint16_t CrabitWakeHistory_Read(char *out, uint16_t capacity, uint32_t index);
 
 extern volatile uint8_t bw16_flash_mode;
 enum { LINE_SIZE = 64, QUEUE_SIZE = 4 };
@@ -63,7 +66,10 @@ static void prepare_reply(char *line)
   if (nonce == NULL || !valid_nonce(nonce + 1)) return;
   *nonce++ = '\0';
   int size = 0;
-  if (!strcmp(line, "CRABIT:USB:STATUS")) {
+  if (!strcmp(line, "CRABIT:WAKE:GET")) {
+    reply_length = CrabitWakeHistory_Read(reply, sizeof(reply), (uint32_t)strtoul(nonce, NULL, 16));
+    return;
+  } else if (!strcmp(line, "CRABIT:USB:STATUS")) {
     size = snprintf(reply, sizeof(reply),
                     "CRABIT:USB:STATUS %s cdc=1 hid=1 test=%s\n", nonce,
                     states[CrabitUsb_KeyboardStatus()]);

@@ -4,7 +4,6 @@
 #include "NanoUI/NanoUI.h"
 #include "components/action_button.h"
 #include "components/settings_option_picker.h"
-#include "components/ble_controls.h"
 #include "sys_config.h"
 #include "global_store.h"
 #include <cmath>
@@ -15,11 +14,11 @@ extern "C" void OLED_WR_Byte(uint8_t dat, uint8_t cmd);
 extern "C" void STM32_UiPoolCheckpoint(unsigned stage);
 #endif
 
-// Display/power drafts use APPLY. Bluetooth is an immediate runtime action;
-// never persist it through the legacy enable_ble boot configuration.
+// Settings are drafts until APPLY. Bluetooth remains a shortcut action outside
+// this page; never persist it through the legacy enable_ble boot configuration.
 class SettingsApp : public Application {
     // Keep the existing picker choices; preserve custom/remote timeout values.
-    static constexpr uint32_t off_times[] = {3000, 5000, 10000, 15000, 30000};
+    static constexpr uint32_t off_times[] = {3000, 5000, 10000, 15000, 30000, 0};
     static constexpr int off_custom = sizeof(off_times) / sizeof(off_times[0]);
 
     float brightness = 0.5f;
@@ -32,7 +31,6 @@ class SettingsApp : public Application {
     uint32_t original_off = 0, original_sleep = 0;
     bool display_previewed = false;
     NanoUI::NanoUIText title = "设置", brightness_text;
-    NanoUI::NanoUIText ble_status_text = "OFF", ble_action_text = "ON";
     NanoUI::StaticVector<const char*, 8> off_labels;
     NanoUI::StaticVector<const char*, 8> face_labels = {"反白底栏", "点阵", "极简", "左右分区",
                                                         "双行时刻"};
@@ -140,17 +138,6 @@ class SettingsApp : public Application {
    public:
     const char* getAppName() override { return "SETTINGS"; }
 
-    void onTick() override {
-        const char* status = Crabit::CompanionBle::status();
-        const char* action = Crabit::CompanionBle::active() ? "OFF" : "ON";
-        if (strcmp(ble_status_text.c_str(), status) || strcmp(ble_action_text.c_str(), action)) {
-            ble_status_text = status;
-            ble_action_text = action;
-            if (WindowManager::instance)
-                WindowManager::instance->markDirty();
-        }
-    }
-
     void onCreate() override {
 #if CRABIT_UI_ALLOC_DIAG
         STM32_UiPoolCheckpoint(1);
@@ -171,13 +158,12 @@ class SettingsApp : public Application {
         lift_wake = sys_cfg.enable_lift_wake;
         tap_wake = sys_cfg.enable_tap_wake;
         save_failed = false;
-        off_labels = {"3s", "5s", "10s", "15s", "30s"};
+        off_labels = {"3s", "5s", "10s", "15s", "30s", "永不"};
         // Do not silently turn a value written elsewhere into NEVER on Apply.
         if (off_index == off_custom)
             off_labels.push_back("自定义");
         display_previewed = false;
         updateLabels();
-        onTick();
     }
 
     void onDestroy() override {
@@ -225,11 +211,6 @@ class SettingsApp : public Application {
                       settingRow("按键灯光", new Switch(key_led, [this](bool) { updateLabels(); })),
                       settingRow("灯光亮度", new Slider(led_level, 100.0f, 48,
                                                         [this](float) { updateLabels(); })),
-                      settingRow(
-                          "蓝牙",
-                          new Button(new Container(new SlidingText(&ble_action_text, 8), 36, 14),
-                                     []() { Crabit::toggleBleFromUi(); })),
-                      new Container(new SlidingText(&ble_status_text, 8), 128, 10),
                       settingRow("表盘",
                                  new SettingsOptionPicker(&face_index, face_labels, changedValue)),
                       new SizedBox(0, 4),

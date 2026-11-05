@@ -7,6 +7,10 @@
 class AmebaStore {
 public:
     static float imu_ax, imu_ay, imu_az;
+    static uint32_t imu_updated_at;
+    static bool imu_received;
+    static int display_contrast;
+    static bool display_dim;
     static int opt_dx, opt_dy;
     static bool opt_lifted;
     static int battery_pct;

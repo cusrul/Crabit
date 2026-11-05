@@ -74,7 +74,7 @@ class ScreenPowerHostTests(unittest.TestCase):
             self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
             run = subprocess.run([str(binary)], capture_output=True, text=True)
             self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
-            self.assertIn("4 passed", run.stdout)
+            self.assertIn("5 passed", run.stdout)
 
     def test_screen_off_sensor_worker_has_bounded_qmi_only_polling(self):
         # Source guard, not execution of the FreeRTOS worker or I2C interrupts.

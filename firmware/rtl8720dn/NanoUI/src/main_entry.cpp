@@ -32,6 +32,10 @@ std::vector<Subscription> AmebaEventBus::subs;
 
 // AmebaStore Physical Storage
 float AmebaStore::imu_ax = 0, AmebaStore::imu_ay = 0, AmebaStore::imu_az = 0;
+uint32_t AmebaStore::imu_updated_at = 0;
+bool AmebaStore::imu_received = false;
+int AmebaStore::display_contrast = -1;
+bool AmebaStore::display_dim = false;
 int AmebaStore::opt_dx = 0, AmebaStore::opt_dy = 0;
 bool AmebaStore::opt_lifted = false;
 int AmebaStore::battery_pct = 0;

@@ -25,6 +25,9 @@ _Noreturn void Error_Handler(void) {
     exit(1);
 }
 volatile uint8_t bw16_flash_mode;
+uint16_t CrabitWakeHistory_Read(char* out, uint16_t capacity, uint32_t index) {
+    return (uint16_t)snprintf(out, capacity, "WAKE %lu\n", (unsigned long)index);
+}
 UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_rx;
 volatile uint16_t ring_last_head;

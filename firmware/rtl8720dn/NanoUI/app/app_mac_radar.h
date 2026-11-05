@@ -147,26 +147,27 @@ struct RadarTarget {
     uint32_t first_seen;
     uint32_t last_seen;
     uint32_t hits;
-    bool is_random; // 新增：识别是否为随机隐私 MAC
 };
 
 static RadarTarget radar_targets[32];
 static int radar_target_count = 0;
 static uint8_t locked_mac[6];
 static volatile uint32_t locked_mac_last_seen = 0;
-static volatile uint32_t locked_hits_recent = 0; // 锁定后最近 3 秒内的探针数
+static volatile uint32_t locked_hits = 0;
+static volatile bool locked_seen = false;
 static volatile bool is_monitoring = false;
 
 extern "C" void radar_promisc_callback(unsigned char *buf, unsigned int len, void *userdata) {
     (void)userdata;
     if (len < 24) return;
     
-    // 只抓手机主动发出的探针请求包 (Probe Request: 0x40)
+    // 仅统计 Wi-Fi 探测请求帧（Probe Request）。
     if (buf[0] == 0x40) {
         if (is_monitoring) {
             if (memcmp(&buf[10], locked_mac, 6) == 0) {
                 locked_mac_last_seen = hal_get_ticks();
-                locked_hits_recent++; // 增加锁定后的活跃计数
+                locked_hits++;
+                locked_seen = true;
             }
             return;
         }
@@ -186,8 +187,6 @@ extern "C" void radar_promisc_callback(unsigned char *buf, unsigned int len, voi
             radar_targets[radar_target_count].first_seen = now;
             radar_targets[radar_target_count].last_seen = now;
             radar_targets[radar_target_count].hits = 1;
-            // 识别本地管理 MAC 位 (Local Admin Bit)，通常表示是随机地址 (0x02)
-            radar_targets[radar_target_count].is_random = (buf[10] & 0x02) != 0;
             radar_target_count++;
         }
     }
@@ -278,9 +277,10 @@ public:
                 // 按 OK 锁定目标
                 if (e.type == EVT_OK) {
                     memcpy(locked_mac, radar_targets[list_idx].mac, 6);
+                    locked_mac_last_seen = 0;
+                    locked_hits = 0;
+                    locked_seen = false;
                     is_monitoring = true;
-                    locked_mac_last_seen = now; // 假设锁定瞬间看见它
-                    locked_hits_recent = 0;
                     state = STATE_MONITOR;
                 }
             }
@@ -291,12 +291,6 @@ public:
                     wifi_set_channel(CHANNELS_2GHZ[scan_ch_idx]);
                     scan_timer = now;
                 }
-                // 每隔3秒重置一次锁定后的“最近探针数”，用于计算威胁等级
-                static uint32_t hit_reset_timer = 0;
-                if (now - hit_reset_timer > 3000) {
-                    locked_hits_recent = 0;
-                    hit_reset_timer = now;
-                }
             }
 
             // ================== UI Professional 渲染 ==================
@@ -304,7 +298,7 @@ public:
             if (state == STATE_SCAN) {
                 // 赛博标题栏
                 canvas->fillRect(0, 0, 128, 14, C_WHITE);
-                canvas->drawText(2, 1, "设备扫描", 8, true);
+                canvas->drawText(2, 1, "探测监听 2.4G", 8, true);
                 
                 // 动态雷达扫描动画
                 int base_r = (now / 20) % 30;
@@ -312,7 +306,7 @@ public:
                 canvas->drawCircle(64, 32, (base_r > 10) ? base_r - 10 : 0, C_WHITE); // 双重波纹
                 
                 // 居中显示已捕获 MAC 数量
-                snprintf(buf, sizeof(buf), "设备: %d", radar_target_count);
+                snprintf(buf, sizeof(buf), "地址:%d", radar_target_count);
                 canvas->fillRect(43, 26, 42, 13, C_BLACK); // 用黑矩形盖住后面的雷达波紋
                 const int16_t countWidth = get_utf8_string_width(buf, 8);
                 canvas->drawText(43 + (42 - countWidth) / 2, 26, buf, 8);
@@ -323,7 +317,7 @@ public:
             } 
             else if (state == STATE_LIST) {
                 canvas->fillRect(0, 0, 128, 14, C_WHITE);
-                canvas->drawText(2, 1, "地址 R随机 P固定", 8, true);
+                canvas->drawText(2, 1, "地址", 8, true);
 
                 // 高级 3 行列表：显示 MAC、探针Hits 和 Aging 时间
                 for (int i = 0; i < 3; i++) {
@@ -337,9 +331,8 @@ public:
                         canvas->fillRect(0, y - 1, 128, 13, C_WHITE); // 高亮条
                     }
                     
-                    // 紧凑 ASCII 地址，R/P 含义由标题说明
-                    snprintf(buf, sizeof(buf), "%02X:%02X..%02X %c",
-                        t.mac[0], t.mac[1], t.mac[5], t.is_random ? 'R' : 'P');
+                    snprintf(buf, sizeof(buf), "%02X:%02X..%02X",
+                        t.mac[0], t.mac[1], t.mac[5]);
                     canvas->drawText(2, y + 2, buf, 8, idx == list_idx);
                     
                     // 右侧靠边显示老化时间 (s 前 seen)
@@ -352,53 +345,23 @@ public:
                 canvas->drawText(2, 51, "返回 确认键锁定", 8, false);
             }
             else if (state == STATE_MONITOR) {
-                int age_sec = (now - locked_mac_last_seen) / 1000;
-                // 判定威胁等级：如果 10 秒内没发包，就不算“危险临近”
-                bool is_danger = (age_sec < 10); 
-                bool blink_phase = is_danger && ((now / 150) % 2 == 0);
-                
-                if (is_danger) {
-                    // 高威胁时全屏反色闪烁
-                    canvas->fillRect(0, 0, 128, 64, blink_phase ? C_WHITE : C_BLACK);
-                    
-                    // 顶部警报栏
-                    canvas->fillRect(0, 0, 128, 14, blink_phase ? C_BLACK : C_WHITE);
-                    canvas->drawText(2, 1, "设备接近提醒", 8, !blink_phase);
-                    
-                    // 绘制锁定十字准星动画
-                    canvas->drawCircle(64, 32, 15, blink_phase ? C_BLACK : C_WHITE);
-                    canvas->drawLine(64, 10, 64, 54, blink_phase ? C_BLACK : C_WHITE); // 垂直线
-                    canvas->drawLine(40, 32, 88, 32, blink_phase ? C_BLACK : C_WHITE); // 水平线
-                    
-                    // 动态计算威胁百分比 (基于 3 秒内 Probe 密集度)
-                    int threat_level = locked_hits_recent * 10; // 一个包代表 10% 威胁
-                    if (threat_level > 100) threat_level = 100;
-                    
-                    snprintf(buf, sizeof(buf), "接近程度: %d%%", threat_level);
-                    // 用反色小块显示威胁值，使其不被十字线盖住
-                    canvas->fillRect(8, 25, 112, 14, blink_phase ? C_BLACK : C_WHITE);
-                    canvas->drawText(10, 26, buf, 8, !blink_phase);
-
+                canvas->fillRect(0, 0, 128, 14, C_WHITE);
+                canvas->drawText(2, 1, "地址监听", 8, true);
+                if (locked_seen) {
+                    const uint32_t last_seen = locked_mac_last_seen;
+                    const uint32_t age_sec = (hal_get_ticks() - last_seen) / 1000;
+                    snprintf(buf, sizeof(buf), "%lu秒前出现", (unsigned long)age_sec);
+                    canvas->drawText(2, 20, buf, 8);
+                    snprintf(buf, sizeof(buf), "探测: %lu", (unsigned long)locked_hits);
+                    canvas->drawText(2, 34, buf, 8);
                 } else {
-                    // 安全监控模式 (Searching)
-                    canvas->fillRect(0, 0, 128, 14, C_WHITE);
-                    canvas->drawText(2, 1, "设备已锁定", 8, true);
-                    
-                    snprintf(buf, sizeof(buf), "%d秒前出现", age_sec);
-                    const int16_t ageWidth = get_utf8_string_width(buf, 8);
-                    canvas->drawText((128 - ageWidth) / 2, 22, buf, 8);
-                    // 居中显示雷达动画
-                    canvas->drawCircle(64, 38, (now / 10) % 30, C_WHITE);
-                    const char* searching = "正在搜索…";
-                    const int16_t searchingWidth = get_utf8_string_width(searching, 8);
-                    canvas->drawText((128 - searchingWidth) / 2, 33, searching, 8);
+                    canvas->drawText(2, 25, "等待记录", 8);
                 }
-                
-                // 底部：始终显示目标硬件 MAC
-                canvas->drawLine(0, 54, 128, 54, is_danger && blink_phase ? C_BLACK : C_WHITE);
+                // 地址可能发生变化，不能作为设备的永久身份。
+                canvas->drawLine(0, 54, 128, 54, C_WHITE);
                 snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X", 
                     locked_mac[0], locked_mac[1], locked_mac[2], locked_mac[3], locked_mac[4], locked_mac[5]);
-                canvas->drawText(16, 56, buf, 8, is_danger && blink_phase);
+                canvas->drawText(16, 56, buf, 8, false);
             }
 
             canvas->display();

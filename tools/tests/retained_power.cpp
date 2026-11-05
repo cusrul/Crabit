@@ -39,6 +39,22 @@ static bool test_disabled_deep_never_enters_stop2() {
     CHECK(screen_power_fake::count("stop2") == 0);
     return true;
 }
+static bool test_other_records_core_snapshots() {
+    begin(70000, 100, 100);
+    sys_cfg.enable_lift_wake = false;
+    WakeCoreTrace::valid = true;
+    WakeCoreTrace::before.icsr = 0x04000000u;
+    WakeCoreTrace::after.pending[0] = 0x02000000u;
+    McuStop2::next_result = {McuStop2::Reason::Other, true, 0, 80000000};
+    const auto previous = WakeHistory::nextSequence;
+    screen_power_fake::now_ms = 70100;
+    SysPower::tick();
+    CHECK(SysPower::isActive());
+    CHECK(WakeHistory::nextSequence == previous + 10u);
+    CHECK(WakeHistory::ring[(WakeHistory::head + WakeHistory::Capacity - 8) % WakeHistory::Capacity].a == 0x04000000u);
+    WakeCoreTrace::valid = false;
+    return true;
+}
 int main() {
     // Motion during entry must not start another full screen-on interval.
     begin(10000, 100, 100);
@@ -57,7 +73,7 @@ int main() {
     if (!SysPower::isActive() || screen_power_fake::count("stop2") != 2) return EXIT_FAILURE;
 
     if (!test_deep_retains_page_and_supply() || !test_busy_usb_keeps_screen_only() ||
-        !test_disabled_deep_never_enters_stop2())
+        !test_disabled_deep_never_enters_stop2() || !test_other_records_core_snapshots())
         return EXIT_FAILURE;
-    std::cout << "Retained SysPower policy: 4 passed\n";
+    std::cout << "Retained SysPower policy: 5 passed\n";
 }

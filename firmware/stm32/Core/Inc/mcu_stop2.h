@@ -21,6 +21,7 @@
 #include "sys_config.h"
 #include "input_feedback.h"
 #include "qmi_wake_trace.h"
+#include "wake_core_trace.h"
 
 extern QMI8658_Driver imu_drv;
 extern PAT9125_Driver pat_drv;
@@ -166,7 +167,8 @@ class WatchPort {
                ((EXTI->PR1 & GPIO_PIN_0) || HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0) == GPIO_PIN_SET);
     }
     bool buttonsReleased() const {
-        return HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_SET &&
+        return !(EXTI->PR1 & GPIO_PIN_6) &&
+               HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_SET &&
                HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7) == GPIO_PIN_SET &&
                HAL_GPIO_ReadPin(GPIOH, GPIO_PIN_3) == GPIO_PIN_RESET;
     }
@@ -233,6 +235,9 @@ class WatchPort {
         HAL_GPIO_Init(GPIOA, &pin);
         EXTI->IMR1 = GPIO_PIN_6;
         EXTI->EMR1 = 0;
+        // PAT is no longer a wake source. Clear its old edge after masking it,
+        // before clearing the shared EXTI9_5 NVIC pending bit.
+        __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_8);
         if (motion_) {
             // Awake WoM probe measured PB0 edges (P0:14, P1:0).
             // Keep QMI INT1 output; listen on physical PB0/EXTI0.
@@ -243,7 +248,7 @@ class WatchPort {
             NVIC_ClearPendingIRQ(EXTI0_IRQn);
             NVIC_EnableIRQ(EXTI0_IRQn);
         }
-        __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
+        // Preserve a PA6 edge that arrives while sleep is being prepared.
         NVIC_ClearPendingIRQ(EXTI9_5_IRQn);
         NVIC_SetPriority(EXTI9_5_IRQn, 5);
         NVIC_EnableIRQ(EXTI9_5_IRQn);
@@ -256,13 +261,32 @@ class WatchPort {
         trace.mask = uint8_t(EXTI->IMR1 & 3u);
         trace.map = uint8_t(SYSCFG->EXTICR[0] & 15u);  // Selected EXTI0 port.
     }
+    static void captureCore(WakeCoreTrace::Snapshot& sample) {
+        sample.icsr = SCB->ICSR;
+        sample.shcsr = SCB->SHCSR;
+        sample.primask = __get_PRIMASK();
+        // Reading SysTick CTRL clears COUNTFLAG, so capture VAL only.
+        sample.systickValue = SysTick->VAL;
+        for (unsigned i = 0; i < 3; ++i) {
+            sample.pending[i] = NVIC->ISPR[i];
+            sample.enabled[i] = NVIC->ISER[i];
+        }
+        sample.exti1 = EXTI->PR1;
+        sample.exti2 = EXTI->PR2;
+        sample.power1 = PWR->SR1;
+        sample.power2 = PWR->SR2;
+    }
     Result wait() {
         Result result;
         const uint32_t before = rtcSeconds();
         __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
+        WakeCoreTrace::valid = false;
+        captureCore(WakeCoreTrace::before);
         __DSB();
         HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
         __ISB();
+        captureCore(WakeCoreTrace::after);
+        WakeCoreTrace::valid = true;
         result.waited = true;
         result.reason = (EXTI->PR1 & GPIO_PIN_6)              ? Reason::Pa6
                         : motion_ && (EXTI->PR1 & GPIO_PIN_0) ? Reason::Qmi

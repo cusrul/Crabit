@@ -50,7 +50,7 @@ public:
         std::vector<ToolDef> tools;
         tools.push_back({icon_log_tools, "抓包", "握手监听", []() { AppManager::launch(new AppWifiSniffer()); }});
         tools.push_back({icon_deauth_tools, "信标", "广播测试", []() { AppManager::launch(new AppWifiBeacon()); }});
-        tools.push_back({icon_spectrum_tools, "雷达", "设备追踪", []() { AppManager::launch(new AppMacRadar()); }});
+        tools.push_back({icon_spectrum_tools, "雷达", "探测监听", []() { AppManager::launch(new AppMacRadar()); }});
         tools.push_back({icon_spectrum_tools, "频谱", "信道流量", []() { AppManager::launch(new AppSpectrum()); }});
         tools.push_back({icon_log_tools, "同步", "记录中转", []() { AppManager::launch(new AppBleSync()); }});
 

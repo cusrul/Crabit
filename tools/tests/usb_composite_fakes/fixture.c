@@ -10,6 +10,9 @@
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #x); exit(1); } } while (0)
 USBD_HandleTypeDef hUsbDeviceFS;
 volatile uint8_t bw16_flash_mode;
+uint16_t CrabitWakeHistory_Read(char* out, uint16_t capacity, uint32_t index) {
+    return (uint16_t)snprintf(out, capacity, "WAKE %lu\n", (unsigned long)index);
+}
 USBD_ClassTypeDef USBD_CUSTOM_HID, USBD_CDC;
 USBD_CDC_ItfTypeDef USBD_Interface_fops_FS;
 static USBD_CUSTOM_HID_HandleTypeDef hid;
@@ -179,6 +182,12 @@ static void diag_fragments(void) {
   receive("CRABIT:USB:ECHO a1b2c3d4\r\n"); drain(1);
   CHECK(!strcmp(replies[1],"CRABIT:USB:ECHO a1b2c3d4\n"));
   CHECK(report_count == 0);
+}
+static void diag_wake(void) {
+  const char *s = "CRABIT:WAKE:GET 0000000a\n";
+  CrabitUsb_DiagReceive((const uint8_t *)s, (uint32_t)strlen(s));
+  CrabitUsb_DiagTick();
+  CHECK(reply_count == 1 && !strcmp(replies[0], "WAKE 10\n"));
 }
 static void diag_malformed(void) {
   const char *bad[]={"CRABIT:USB:TYPE 123\n", "CRABIT:USB:TYPE 1234567z\n",
@@ -351,6 +360,7 @@ int main(int argc, char **argv) {
   else if (!strcmp(name,"reset_reinit")) reset_reinit();
   else if (!strcmp(name,"led_rearm")) led_rearm();
   else if (!strcmp(name,"diag_fragments")) diag_fragments();
+  else if (!strcmp(name,"diag_wake")) diag_wake();
   else if (!strcmp(name,"diag_malformed")) diag_malformed();
   else if (!strcmp(name,"diag_overflow")) diag_overflow();
   else if (!strcmp(name,"diag_type_busy")) diag_type_busy();

@@ -25,6 +25,8 @@
 #include "wake_metrics.h"
 #include "mcu_stop2.h"
 #include "idle_sleep_policy.h"
+#include "wake_history.h"
+#include "wake_core_trace.h"
 extern void STM32_ResetInputAfterWake();
 
 extern SystemConfig sys_cfg;
@@ -140,7 +142,34 @@ private:
     static void enterDeepSleep() {
         sensor_wake_locked = true;
         current_state = STATE_DEEP_SLEEP;
+        const uint32_t previousAttempt = QmiWakeTrace::last.attempts;
         const McuStop2::Result result = McuStop2::runWatch();
+        const auto& trace = QmiWakeTrace::last;
+        const bool hasTrace = trace.attempts != previousAttempt;
+        const uint32_t flags = uint32_t(result.reason) | (result.waited ? 0x100u : 0u) |
+            (hasTrace ? 0x200u : 0u) | (hasTrace && trace.statusOk ? 0x400u : 0u) |
+            (hasTrace && trace.prepared ? 0x800u : 0u);
+        const uint32_t lines = hasTrace ? uint32_t(trace.beforeLevels) | (uint32_t(trace.beforePending) << 4) |
+            (uint32_t(trace.afterLevels) << 8) | (uint32_t(trace.afterPending) << 12) |
+            (uint32_t(trace.mask) << 16) | (uint32_t(trace.map) << 20) : 0u;
+        const uint32_t wom = hasTrace ? uint32_t(trace.status) | (uint32_t(trace.regs[4]) << 8) |
+            (uint32_t(trace.regs[5]) << 16) | (uint32_t(trace.valid) << 24) : 0u;
+        WakeHistory::record(HAL_GetTick(), WakeHistory::StopResult, flags, result.seconds, lines, wom);
+        if (result.waited && WakeCoreTrace::valid && result.reason == McuStop2::Reason::Other) {
+            const uint32_t tick = HAL_GetTick();
+            const auto save = [tick](const WakeCoreTrace::Snapshot& s, bool before) {
+                WakeHistory::record(tick, before ? WakeHistory::CoreBefore : WakeHistory::CoreAfter,
+                                    s.icsr, s.shcsr, s.primask, s.systickValue);
+                WakeHistory::record(tick, before ? WakeHistory::PendingBefore : WakeHistory::PendingAfter,
+                                    s.pending[0], s.pending[1], s.pending[2]);
+                WakeHistory::record(tick, before ? WakeHistory::EnabledBefore : WakeHistory::EnabledAfter,
+                                    s.enabled[0], s.enabled[1], s.enabled[2]);
+                WakeHistory::record(tick, before ? WakeHistory::ExtiPowerBefore : WakeHistory::ExtiPowerAfter,
+                                    s.exti1, s.exti2, s.power1, s.power2);
+            };
+            save(WakeCoreTrace::before, true);
+            save(WakeCoreTrace::after, false);
+        }
         WakeMetrics::stop_reason.store(uint32_t(result.reason), std::memory_order_relaxed);
         WakeMetrics::stop_seconds.store(result.seconds, std::memory_order_relaxed);
         WakeMetrics::stop_hclk.store(result.hclk, std::memory_order_relaxed);
@@ -283,6 +312,7 @@ public:
         else {
             if (current_state == STATE_ACTIVE) { 
                 OLED_SetSleep(true); 
+                WakeHistory::record(now, WakeHistory::ScreenOff);
                 current_state = STATE_SCREEN_OFF; sensor_wake_locked = true; 
                 screen_off_tick = now;
                 was_in_zone = false;

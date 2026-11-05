@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory=$true)][string]$Compiler,
     [Parameter(Mandatory=$true)][string]$Bundle,
-    [Parameter(Mandatory=$true)][string]$Output
+    [Parameter(Mandatory=$true)][string]$Output,
+    [ValidatePattern('^[0-9A-Za-z.+-]+$')][string]$AppVersion = '0.2.0-preview.1'
 )
 $ErrorActionPreference = 'Stop'
 $bundlePath = (Resolve-Path -LiteralPath $Bundle).Path
@@ -17,6 +18,6 @@ if ($forbidden) { throw 'Bundle contains runtime caches, private inputs or devel
 $outputPath = [IO.Path]::GetFullPath($Output)
 if (Test-Path -LiteralPath $outputPath) { throw 'Choose a new output directory; existing output is preserved.' }
 New-Item -ItemType Directory -Path $outputPath | Out-Null
-& $compilerPath "/DBundleDir=$bundlePath" "/DOutputDir=$outputPath" (Join-Path $PSScriptRoot 'crabit-windows.iss')
+& $compilerPath "/DBundleDir=$bundlePath" "/DOutputDir=$outputPath" "/DAppVersion=$AppVersion" (Join-Path $PSScriptRoot 'crabit-windows.iss')
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
-Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $outputPath 'Crabit-Setup-0.2.0-preview.1-x64.exe')
+Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $outputPath "Crabit-Setup-$AppVersion-x64.exe")

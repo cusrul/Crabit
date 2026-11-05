@@ -44,3 +44,4 @@ Name: "{autodesktop}\Crabit"; Filename: "{app}\crabit_watch_app.exe"; Tasks: des
 
 [Run]
 Filename: "{app}\crabit_watch_app.exe"; Description: "Open Crabit"; Flags: nowait postinstall skipifsilent
+

@@ -8,10 +8,11 @@ release_branch = "main"
 [components.workflow]
 template = "cpp-cmake"
 path = "tools"
-ci = "none"
+ci = "ci/product-contract.yml"
 
 [components.workflow.tasks]
 check = ["python", "engineering.py", "check"]
+verify = ["python", "verify_native_workflow.py"]
 
 [components.stm32]
 template = "cpp-cmake"

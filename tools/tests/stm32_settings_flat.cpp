@@ -280,12 +280,12 @@ int main(int argc, char** argv) {
     const std::vector<uint8_t> initialPixels(canvas.pixels, canvas.pixels + sizeof canvas.pixels);
     snapshot(canvas, snapshotDir, "initial");
     checked(dynamic_cast<RenderSlider*>(focus(wm)) != nullptr, "reopened focus starts at brightness");
-    moveFocus(wm, 14);
-    checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "focus index 14 is APPLY");
+    moveFocus(wm, 13);
+    checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "focus index 13 is APPLY");
     snapshot(canvas, snapshotDir, "actions_bottom");
     checked(std::equal(initialPixels.begin(), initialPixels.begin() + 128 * 12,
                        canvas.pixels), "fixed title/header pixels remain stationary while scrolling");
-    movePrevious(wm, 12); // APPLY -> face/BLE/inputs/deep sleep -> screen off
+    movePrevious(wm, 11); // APPLY -> face/BLE/inputs/deep sleep -> screen off
     checked(dynamic_cast<RenderSettingsOptionPicker*>(focus(wm)) != nullptr,
             "focus index 2 is the screen-off picker");
     send(wm, EVT_OK);
@@ -307,7 +307,7 @@ int main(int argc, char** argv) {
     checked(!*patSwitch->value && CrabitPreferences::enabled(CrabitPreferences::Pat),
             "PAT stays a draft until Apply");
     snapshot(canvas, snapshotDir, "input_editing");
-    moveFocus(wm, 10); // PAT -> QMI -> lift -> tap -> sound -> volume -> LED -> level -> BLE -> face -> APPLY
+    moveFocus(wm, 9); // PAT -> QMI -> lift -> tap -> sound -> volume -> LED -> level -> BLE -> face -> APPLY
     checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "focus index 14 is APPLY after the input rows");
     checked(wm.getStackSize() == anchorPages + 1, "toast does not push a WM page");
     const SystemConfig unrelatedBeforeApply = sys_cfg;
@@ -389,7 +389,7 @@ int main(int argc, char** argv) {
     moveFocus(wm, 1);
     checked(dynamic_cast<RenderSwitch*>(focus(wm)) != nullptr, "reopened committed page reaches invert second");
     send(wm, EVT_OK); // true -> false draft
-    moveFocus(wm, 13); // invert -> screen-off -> deep sleep/PAT/QMI/lift/tap/sound/volume/LED/level/BLE/face -> APPLY
+    moveFocus(wm, 12); // invert -> screen-off -> deep sleep/PAT/QMI/lift/tap/sound/volume/LED/level/BLE/face -> APPLY
     checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "reopened page reaches focus index 14 APPLY");
     send(wm, EVT_OK);
     frame(wm, 2);
@@ -398,7 +398,7 @@ int main(int argc, char** argv) {
     checked(!sys_cfg.invert_disp && settings_flat_flash_unlock_calls == 3 &&
             settings_flat_flash_program_calls == 21,
             "second changed Apply commits invert through one more save");
-    movePrevious(wm, 13); // APPLY -> invert
+    movePrevious(wm, 12); // APPLY -> invert
     send(wm, EVT_OK); // new preview after the successful Apply
     checked(sys_cfg.invert_disp == false && settings_flat_oled_bytes[settings_flat_oled_calls - 1] == 0xA7,
             "post-Apply invert preview remains a draft");
@@ -416,7 +416,7 @@ int main(int argc, char** argv) {
     frame(wm, 3);
     moveFocus(wm, 1); // invert
     send(wm, EVT_OK);
-    moveFocus(wm, 13); // invert -> ... -> APPLY
+    moveFocus(wm, 12); // invert -> ... -> APPLY
     send(wm, EVT_OK);
     checked(sys_cfg.screen_off_ms == 0 && sys_cfg.deep_sleep_ms == 0,
             "unrelated invert Apply preserves both stored zero timeout values");
@@ -425,7 +425,7 @@ int main(int argc, char** argv) {
     send(wm, EVT_BACK);
     frame(wm, 2);
 
-    // Screen-off zero is a stored CUSTOM value, never an offered option. The
+    // Screen-off zero is the explicit Never option. The
     // disabled deep-sleep switch remains unchanged during this screen-off edit.
     AppManager::launch(new SettingsApp());
     frame(wm, 3);
@@ -440,11 +440,11 @@ int main(int argc, char** argv) {
     checked(sys_cfg.deep_sleep_ms == 0, "disabled deep sleep remains zero while navigating");
     moveFocus(wm, 1); // deep sleep -> PAT
     checked(dynamic_cast<RenderSwitch*>(focus(wm)) != nullptr, "focus index 4 is PAT");
-    moveFocus(wm, 10); // PAT -> QMI/lift/tap/sound/volume/LED/level/BLE/face/APPLY
+    moveFocus(wm, 9); // PAT -> QMI/lift/tap/sound/volume/LED/level/BLE/face/APPLY
     checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "zero-valued screen-off reaches APPLY");
     send(wm, EVT_OK);
     checked(sys_cfg.screen_off_ms == 3000,
-            "screen-off zero is retained as CUSTOM and is not offered as NEVER");
+            "Never can be changed back to a finite screen-off timeout");
     checked(sys_cfg.deep_sleep_ms == 0,
             "screen-off Apply preserves the legacy deep-sleep value without a picker");
     checked(settings_flat_flash_unlock_calls == 5 && settings_flat_flash_program_calls == 35,
@@ -461,36 +461,14 @@ int main(int argc, char** argv) {
     moveFocus(wm, 1);
     checked(*static_cast<RenderSwitch*>(focus(wm))->value,
             "reopened invert switch reflects applied value");
-    moveFocus(wm, 13);
+    moveFocus(wm, 12);
     checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "focus reaches APPLY from invert");
     moveFocus(wm, 1);
     checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "BACK follows APPLY in the action row");
     send(wm, EVT_OK); // Exercise the actual BACK button callback, not only global Back.
     frame(wm, 2);
     checked(wm.getStackSize() == anchorPages, "final Back returns to anchor page");
-    AppManager::launch(new SettingsApp());
-    frame(wm, 3);
-    const auto saves_before_ble = settings_flat_flash_unlock_calls;
-    moveFocus(wm, 12); // Bluetooth immediate action, separate from APPLY.
-    send(wm, EVT_OK);
-    checked(Crabit::CompanionBle::toggle_calls == 1 && Crabit::CompanionBle::active(),
-            "Settings Bluetooth uses shared session toggle immediately");
-    AppManager::tick();
-    frame(wm, 120); // Let the STARTING toast expire before visual inspection.
-    moveFocus(wm, 1); // Reveal the status line above APPLY in the scroll viewport.
-    snapshot(canvas, snapshotDir, "bluetooth_on");
-    movePrevious(wm, 1);
-    checked(settings_flat_flash_unlock_calls == saves_before_ble && sys_cfg.enable_ble,
-            "Bluetooth action never persists or changes legacy boot preference");
-    Crabit::CompanionBle::fake_transitioning = true;
-    send(wm, EVT_OK);
-    checked(Crabit::CompanionBle::toggle_calls == 1, "transitioning session rejects repeated UI toggle");
-    Crabit::CompanionBle::fake_transitioning = false;
-    send(wm, EVT_OK);
-    checked(Crabit::CompanionBle::toggle_calls == 2 && !Crabit::CompanionBle::active(),
-            "Settings can stop the active session through same owner");
-    send(wm, EVT_BACK);
-    frame(wm, 2);
+    checked(Crabit::CompanionBle::toggle_calls == 0, "Settings never toggles Bluetooth");
     // Old config tail padding cannot become a random watch-face preference.
     uint8_t old_fields[42];
     std::memcpy(old_fields, &sys_cfg, sizeof(old_fields));
@@ -503,7 +481,7 @@ int main(int argc, char** argv) {
     const auto before_face_save = settings_flat_flash_unlock_calls;
     AppManager::launch(new SettingsApp());
     frame(wm, 3);
-    moveFocus(wm, 13);
+    moveFocus(wm, 12);
     checked(dynamic_cast<RenderSettingsOptionPicker*>(focus(wm)) != nullptr,
             "focus index 13 is the face picker");
     send(wm, EVT_OK); send(wm, EVT_LEFT); send(wm, EVT_OK);
@@ -513,7 +491,7 @@ int main(int argc, char** argv) {
             "discarding a face draft never saves");
     AppManager::launch(new SettingsApp());
     frame(wm, 3);
-    moveFocus(wm, 13);
+    moveFocus(wm, 12);
     send(wm, EVT_OK); send(wm, EVT_LEFT); send(wm, EVT_OK);
     moveFocus(wm, 1); send(wm, EVT_OK);
     checked(sys_cfg.watch_face == Crabit::watchFaceCount - 1 &&

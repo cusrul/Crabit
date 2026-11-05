@@ -5,7 +5,7 @@
 Arduino 工程位于 `NanoUI/`，入口是 `NanoUI/NanoUI.ino`，使用 Realtek AmebaD core。
 新用户先读[当前状态](../../docs/guide/status.md)和[完整构建指南](../../docs/guide/build-and-flash.md)。
 Arduino IDE 默认构建选择 Wi-Fi 工具 + Hopper 试验 profile；独立网络同步默认关闭，天气由手机中继。其他显式 profile 不代表可直接作为产品固件。
-当前是基本可用、等待收敛的版本，验证码链路已有用户烧录后的正向反馈，但没有稳定的成对发行包或完整回归验收。六位验证码不是 BLE SMP 配对或加密机制。详见[当前状态](../../docs/guide/status.md)和验证码候选记录。
+已有公开预览版下载；维护者于 2026-11-05 确认近期修改实机通过，下一套本地候选正在固定，尚未更新公开附件。六位验证码不是 BLE SMP 配对或加密机制。详见[当前状态](../../docs/guide/status.md)和[下载说明](../../docs/downloads.md)。
 
 从仓库根目录执行带共享库与镜像检查的构建：
 

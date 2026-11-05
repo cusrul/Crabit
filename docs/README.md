@@ -1,7 +1,5 @@
 # Crabit 文档
 
-从GitHub克隆的前置配置、构建命令及验证范围见[复现构建](reproduction.md)。
-
 ## 使用
 
 - [下载与安装](downloads.md)
@@ -14,6 +12,8 @@
 
 - [搭建环境](../showcase/docs/setup.md)
 - [第一个 App](../showcase/docs/first-app.md)
+- [新增 STM32 App](../showcase/docs/stm32-first-app.md)
+- [新增 BW16 App](../showcase/docs/bw16-first-app.md)
 - [系统导读](../showcase/docs/system-walkthrough.md)
 - [Flutter 开发](../showcase/docs/flutter-development.md)
 - [联动练习](../showcase/docs/integration-lab.md)

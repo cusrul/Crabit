@@ -185,10 +185,11 @@ private:
             int y = f.y / q + CENTER_Y - s / 2;
             
             // 绘制地板外框与内部网格线(交替模拟图案)
+            if (s < 1) continue;
             canvas->drawRect(x, y, s, s, C_WHITE);
-            if (idx % 2 == 0) {
-                canvas->drawLine(x, y, x + s, y + s, C_WHITE);
-                canvas->drawLine(x + s, y, x, y + s, C_WHITE);
+            if (s >= 8) {
+                canvas->drawLine(x + 1, y + s - 2, x + s - 2, y + s - 2, C_WHITE);
+                if (s >= 14) canvas->drawRect(x + 3, y + 3, s - 6, s - 6, C_WHITE);
             }
         }
 
@@ -204,10 +205,12 @@ private:
 
         // 3. HUD
         char buf[32];
-        snprintf(buf, sizeof(buf), "分:%d", score);
-        canvas->drawText(0, 0, buf, 12);
-        snprintf(buf, sizeof(buf), "级:%d", level);
-        canvas->drawText(88, 0, buf, 12);
+        canvas->fillRect(0, 0, 128, 10, C_BLACK);
+        snprintf(buf, sizeof(buf), "SCORE %d", score);
+        canvas->drawText(2, 1, buf, 8);
+        snprintf(buf, sizeof(buf), "LV %d", level);
+        canvas->drawText(94, 1, buf, 8);
+        canvas->drawLine(0, 10, 127, 10, C_WHITE);
     }
 
 public:
@@ -218,6 +221,10 @@ public:
         bool running = true;
         uint32_t last_frame_time = hal_get_ticks();
         state = HOPPER_STATE_TITLE;
+        float zero_x = 0, zero_y = 0, filtered_x = 0, filtered_y = 0;
+        unsigned calibration_samples = 0;
+        uint32_t last_imu_sample = 0;
+        int tilt_x = 0, tilt_y = 0;
 
         while(running && is_display_active) {
             UIEvent e = input->poll();
@@ -240,13 +247,46 @@ public:
             canvas->clear();
 
             if (state == HOPPER_STATE_TITLE) {
-                canvas->drawText(40, 16, "立体跳跃", 12);
-                canvas->drawText(28, 40, "按确认键开始", 12);
+                canvas->drawText(43, 13, "HOPPER", 12);
+                canvas->drawLine(28, 28, 100, 28, C_WHITE);
+                canvas->drawText(32, 35, "TILT TO MOVE", 8);
+                canvas->drawText(36, 49, "OK TO START", 8);
                 if (e.type == EVT_OK || (raw_btns & (1<<4))) {
                     initGame();
+                    zero_x = zero_y = filtered_x = filtered_y = 0;
+                    calibration_samples = 0;
+                    last_imu_sample = AmebaStore::imu_updated_at;
+                    tilt_x = tilt_y = 0;
                 }
             } 
             else if (state == HOPPER_STATE_GAME) {
+                const bool fresh = AmebaStore::imu_received &&
+                    current_time - AmebaStore::imu_updated_at < 500;
+                if (fresh && last_imu_sample != AmebaStore::imu_updated_at) {
+                    last_imu_sample = AmebaStore::imu_updated_at;
+                    const float ax = AmebaStore::imu_ax, ay = AmebaStore::imu_ay;
+                    const float az = AmebaStore::imu_az;
+                    const float magnitude2 = ax * ax + ay * ay + az * az;
+                    if (magnitude2 > 0.25f && magnitude2 < 2.25f) {
+                        if (calibration_samples < 15) {
+                            zero_x += ax / 15.0f;
+                            zero_y += ay / 15.0f;
+                            ++calibration_samples;
+                        } else {
+                            filtered_x += 0.2f * (ax - zero_x - filtered_x);
+                            filtered_y += 0.2f * (ay - zero_y - filtered_y);
+                            if (tilt_x == 0) tilt_x = filtered_x > 0.22f ? 1 : (filtered_x < -0.22f ? -1 : 0);
+                            else if (tilt_x * filtered_x < 0.12f) tilt_x = 0;
+                            if (tilt_y == 0) tilt_y = filtered_y > 0.22f ? 1 : (filtered_y < -0.22f ? -1 : 0);
+                            else if (tilt_y * filtered_y < 0.12f) tilt_y = 0;
+                        }
+                    } else { tilt_x = tilt_y = 0; }
+                }
+                if (!fresh) tilt_x = tilt_y = 0;
+                if (tilt_x > 0) raw_btns |= 1 << 2;
+                if (tilt_x < 0) raw_btns |= 1 << 3;
+                if (tilt_y < 0) raw_btns |= 1 << 0;
+                if (tilt_y > 0) raw_btns |= 1 << 1;
                 updatePhysics(raw_btns);
                 renderGame(canvas);
             } 
@@ -254,11 +294,11 @@ public:
                 renderGame(canvas);
                 canvas->fillRect(20, 18, 88, 32, C_BLACK);
                 canvas->drawRect(20, 18, 88, 32, C_WHITE);
-                canvas->drawText(40, 21, "游戏结束", 12);
+                canvas->drawText(37, 21, "GAME OVER", 8);
                 
                 char buf[32];
-                snprintf(buf, sizeof(buf), "最高:%d", hiscore);
-                canvas->drawText(36, 35, buf, 12);
+                snprintf(buf, sizeof(buf), "BEST %d", hiscore);
+                canvas->drawText(38, 35, buf, 8);
                 
                 if (e.type == EVT_OK || (raw_btns & (1<<4))) {
                     state = HOPPER_STATE_TITLE;

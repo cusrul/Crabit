@@ -153,6 +153,13 @@ int main() {
         assert(r.waited && r.reason == Reason::Qmi);
         assert(!p.off && p.hardwareReady && !p.paused);
     }
+    {
+        Port p;
+        p.wake = Reason::Qmi;
+        p.restored = false;
+        const auto r = McuStop2::run(p);
+        assert(r.reason == Reason::SensorFailed && !p.off && p.hardwareReady && !p.paused);
+    }
     char text[32];
     assert(WakeDiag::format(text, sizeof text, WakeDiag::Row::Wake, 1, 6, 12));
     assert(strcmp(text, "1/P6/12s") == 0);

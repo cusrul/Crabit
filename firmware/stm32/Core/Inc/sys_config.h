@@ -35,7 +35,7 @@ struct __attribute__((aligned(8))) SystemConfig {
     float wake_z_min = 0.3f;  
 
     // 4. 屏幕配置
-    float brightness = 0.5f;   
+    float brightness = 0.2f;
     bool  invert_disp = false; 
 
     // 5. 蓝牙连接配置

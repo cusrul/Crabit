@@ -136,7 +136,7 @@ class FlatSettingsHostTests(unittest.TestCase):
         self.assertIn("new Container(new SlidingText(&title, 8), 128, 12)", app_text)
         self.assertIn('"%d%%"', app_text)
         self.assertIn('"自定义"', app_text)
-        self.assertIn("off_times[] = {3000, 5000, 10000, 15000, 30000}", app_text)
+        self.assertIn("off_times[] = {3000, 5000, 10000, 15000, 30000, 0}", app_text)
         self.assertIn("bool deep_sleep_enabled = true;", app_text)
         self.assertIn("uint32_t sleepDelay() const", app_text)
         self.assertIn("deep_sleep_enabled = original_sleep != 0;", app_text)
@@ -145,7 +145,7 @@ class FlatSettingsHostTests(unittest.TestCase):
         self.assertIn(
             "static constexpr int off_custom = sizeof(off_times) / sizeof(off_times[0])", app_text
         )
-        self.assertIn('off_labels = {"3s", "5s", "10s", "15s", "30s"};', app_text)
+        self.assertIn('off_labels = {"3s", "5s", "10s", "15s", "30s", "永不"};', app_text)
         self.assertNotIn("sleep_labels", app_text)
         self.assertNotIn('new Container(new Text("当前仅息屏 不深睡", 8), 128, 10)', app_text)
         self.assertIn("class SettingsOptionPicker", picker_text)

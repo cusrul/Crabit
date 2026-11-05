@@ -7,6 +7,9 @@
 #include "idle_sleep_policy.h"
 #include "mcu_stop2_sequence.h"
 #include "wake_metrics.h"
+#include "qmi_wake_trace.h"
+#include "wake_history.h"
+#include "wake_core_trace.h"
 
 using HAL_StatusTypeDef = enum { HAL_OK = 0, HAL_ERROR = 1 };
 

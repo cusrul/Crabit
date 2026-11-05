@@ -6,6 +6,7 @@
 
 - 已拿到手表：[快速使用](docs/start.md) → [连接 App](docs/connect.md) → [App 操作](docs/app-guide.md)。
 - 想开始写界面：[环境搭建](docs/setup.md) → [第一个 App](docs/first-app.md) → [界面开发](docs/ui-development.md) → [字体图片](docs/resources.md)。
+- 想把 App 放到真实设备：[新增 STM32 App](docs/stm32-first-app.md) → [新增 BW16 App](docs/bw16-first-app.md)；完整可运行代码在 `examples/device-apps/`，不会自动装进产品菜单。
 - 想理解整条链路：[系统导读](docs/system-walkthrough.md) → [Flutter 第一页](docs/flutter-first-page.md) → [客户端开发](docs/flutter-development.md) → [联动练习](docs/integration-lab.md) → [温度报告卡](docs/sensor-project.md)。
 - 从硬件复刻：[复刻路线](docs/replicate.md)；更新设备先读 [更新与恢复](docs/update.md)，缺少已确认的接线和版本时不要自行刷写。
 

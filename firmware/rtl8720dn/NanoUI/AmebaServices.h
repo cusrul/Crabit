@@ -34,6 +34,8 @@ private:
         int pat[3];
         int battery;
         int buttons;
+        int contrast = -1;
+        int dim = -1;
     };
     struct PendingWifiDiagnostic {
         uint16_t request_id;
@@ -122,9 +124,16 @@ private:
     }
 
     static void applySensors(const PendingSensors& sensors) {
+        if (sensors.contrast >= 0 && sensors.contrast <= 255 &&
+            (sensors.dim == 0 || sensors.dim == 1)) {
+            AmebaStore::display_contrast = sensors.contrast;
+            AmebaStore::display_dim = sensors.dim == 1;
+        }
         AmebaStore::imu_ax = sensors.imu[0] / 100.0f;
         AmebaStore::imu_ay = sensors.imu[1] / 100.0f;
         AmebaStore::imu_az = sensors.imu[2] / 100.0f;
+        AmebaStore::imu_updated_at = hal_get_ticks();
+        AmebaStore::imu_received = true;
         AmebaStore::opt_dx = sensors.pat[0];
         AmebaStore::opt_dy = sensors.pat[1];
         AmebaStore::opt_lifted = (sensors.pat[2] == 1);
@@ -199,10 +208,11 @@ public:
         AmebaEventBus::subscribe("sns/all", [](const char* v) {
             if (!v || !sensor_queue) return;
             PendingSensors sensors{};
-            if (sscanf(v, "%d,%d,%d|%d,%d,%d|%d|%d",
+            if (sscanf(v, "%d,%d,%d|%d,%d,%d|%d|%d|%d|%d",
                        &sensors.imu[0], &sensors.imu[1], &sensors.imu[2],
                        &sensors.pat[0], &sensors.pat[1], &sensors.pat[2],
-                       &sensors.battery, &sensors.buttons) == 8) {
+                       &sensors.battery, &sensors.buttons,
+                       &sensors.contrast, &sensors.dim) >= 8) {
                 xQueueSend(sensor_queue, &sensors, 0);
             }
         });

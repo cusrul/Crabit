@@ -194,6 +194,11 @@ extern "C" void USB_LOG(const char* format, ...) {
 #endif
 }
 
+// Called by the existing USB diagnostic dispatcher on the UI task only.
+extern "C" uint16_t CrabitWakeHistory_Read(char* out, uint16_t capacity, uint32_t index) {
+    return static_cast<uint16_t>(WakeHistory::format(out, capacity, index));
+}
+
 
 
 // 全局变量声明

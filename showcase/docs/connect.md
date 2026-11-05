@@ -101,7 +101,7 @@ USB 示例只在自有电脑或授权环境运行，先用文本编辑器验证�
 
 ## 客户端下载
 
-本次预览版的 Windows 与 Android 包，以及 STM32/BW16 固件，见[Crabit v0.2.0-preview.1 下载说明](../../docs/downloads.md)。这是预览版；Android 使用 Debug 证书签名且未做手机实机验收。拿到设备时请使用与其固件对应的客户端版本。
+本次预览版的 Windows 与 Android 包，以及 STM32/BW16 固件，见[Crabit v0.2.0-preview.1 下载说明](https://github.com/cusrul/Crabit/blob/main/docs/downloads.md)。这是预览版；Android 使用 Debug 证书签名且未做手机实机验收。拿到设备时请使用与其固件对应的客户端版本。
 
 连接完成后继续阅读[使用 App](app-guide.md)。连接异常先关闭本次连接并记录错误，不反复烧录来处理普通连接问题。
 需要更新时继续阅读[固件与恢复](update.md)。

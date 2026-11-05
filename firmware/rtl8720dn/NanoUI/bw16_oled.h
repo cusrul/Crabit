@@ -3,6 +3,7 @@
 
 #include <SPI.h>
 #include "src/NanoUI.h"
+#include "AmebaStore.h"
 
 // 硬件引脚定义
 #define OLED_MOSI PA12
@@ -14,6 +15,8 @@
 class Bw16RawCanvas : public Canvas {
 private:
     uint8_t buffer[1024];
+    int applied_contrast = -1;
+    bool applied_dim = false;
 
     void oled_write_byte(uint8_t dat, uint8_t cmd) {
         digitalWrite(OLED_DC, cmd ? HIGH : LOW);
@@ -32,6 +35,7 @@ public:
         digitalWrite(OLED_RST, HIGH); delay(50); digitalWrite(OLED_RST, LOW); delay(100); digitalWrite(OLED_RST, HIGH); delay(100);
         uint8_t init_cmds[] = {0xAE, 0xD5, 0x80, 0xA8, 0x3F, 0xD3, 0x00, 0x40, 0x8D, 0x14, 0x20, 0x02, 0xA1, 0xC8, 0xDA, 0x12, 0x81, 0xCF, 0xD9, 0xF1, 0xDB, 0x40, 0xA4, 0xA6, 0xAF};
         for(uint8_t c : init_cmds) oled_write_byte(c, 0);
+        applied_contrast = -1;
     }
 
     void clear() override { memset(buffer, 0, 1024); }
@@ -46,6 +50,17 @@ public:
     }
 
     void display() override {
+        // The canvas owner applies received preferences only after OLED handover.
+        const int contrast = AmebaStore::display_contrast;
+        const bool dim = AmebaStore::display_dim;
+        if (contrast >= 0 && contrast <= 255 &&
+            (contrast != applied_contrast || dim != applied_dim)) {
+            oled_write_byte(0x81, 0); oled_write_byte((uint8_t)contrast, 0);
+            oled_write_byte(0xD9, 0); oled_write_byte(dim ? 0x11 : 0x22, 0);
+            oled_write_byte(0xDB, 0); oled_write_byte(dim ? 0x00 : 0x20, 0);
+            applied_contrast = contrast;
+            applied_dim = dim;
+        }
         for (int i = 0; i < 8; i++) {
             oled_write_byte(0xB0 + i, 0); oled_write_byte(0x00, 0); oled_write_byte(0x10, 0);
             digitalWrite(OLED_DC, HIGH); digitalWrite(OLED_CS, LOW);

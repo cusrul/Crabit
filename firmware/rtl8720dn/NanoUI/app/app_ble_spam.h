@@ -17,6 +17,24 @@ public:
         const bool busy = owner.state != RadioSvc::IDLE ||
                           RadioSvc::companionActive();
         BW16BLESpammer spammer;
+        enum class Mode : uint8_t { All, Android, IosDevice, IosAction, Count };
+        Mode mode = Mode::All;
+        const auto startMode = [&spammer](Mode selected) {
+            switch (selected) {
+                case Mode::Android: spammer.start(BW16BLESpammer::ANDROID_BURST); break;
+                case Mode::IosDevice: spammer.start(BW16BLESpammer::IOS_NEW_DEVICE); break;
+                case Mode::IosAction: spammer.start(BW16BLESpammer::IOS_ACTION_MODAL); break;
+                default: spammer.start(BW16BLESpammer::ALL_BURST); break;
+            }
+        };
+        const auto modeLabel = [](Mode selected) -> const char* {
+            switch (selected) {
+                case Mode::Android: return "Android";
+                case Mode::IosDevice: return "iOS Device";
+                case Mode::IosAction: return "iOS Action";
+                default: return "All";
+            }
+        };
 
         if (!busy) {
             canvas->clear();
@@ -27,7 +45,7 @@ public:
             spammer.begin();
             spammer.setDebugLogging(false);
             spammer.setInterval(1000);
-            spammer.start(BW16BLESpammer::ALL_BURST);
+            startMode(mode);
         }
 
         uint32_t lastUiDraw = 0;
@@ -35,6 +53,14 @@ public:
         while (is_display_active) {
             const UIEvent event = input->poll();
             if (event.type == EVT_BACK) break;
+
+            if (!busy && (event.type == EVT_UP || event.type == EVT_DOWN)) {
+                const int count = int(Mode::Count);
+                const int delta = event.type == EVT_UP ? -1 : 1;
+                mode = Mode((int(mode) + delta + count) % count);
+                startMode(mode);
+                firstUiDraw = true;
+            }
 
             if (!busy) spammer.tick();
 
@@ -44,9 +70,9 @@ public:
                 lastUiDraw = now;
                 canvas->clear();
                 canvas->drawText(2, 2, "蓝牙广播", 8);
-                canvas->drawText(2, 18, "全部类型 每秒轮换", 8);
+                canvas->drawText(2, 18, modeLabel(mode), 8);
                 canvas->drawText(2, 34, busy ? "无线被占用" : "运行中", 8);
-                canvas->drawText(2, 50, busy ? "先关闭后台蓝牙" : "返回键停止并退出", 8);
+                canvas->drawText(2, 50, busy ? "先关闭后台蓝牙" : "UP/DN MODE  BACK", 8);
                 canvas->display();
             }
             safe_delay(10);
