@@ -10,6 +10,8 @@
 
 安装、适用硬件与公开初始验证码见[预览版下载说明](docs/downloads.md)。
 
+自己制作 PCB：[下载已验证的 Gerber 打样包](hardware/manufacturing/crabit-v1.2/README.md)。
+
 ## 可以做什么
 
 - **日常使用**：多款表盘、时间与天气、蓝牙状态、运动唤醒与 STOP2 休眠。
