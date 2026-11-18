@@ -2,6 +2,8 @@
 #define APP_EVENT_TEST_H
 
 #include "NanoUI/NanoUI.h"
+#include "topics.h"
+#include "comms_link.h"
 #include "global_store.h"
 #include "event_bus.h"
 #include "main.h" 
@@ -9,8 +11,6 @@
 #include <string.h>
 #include <stdio.h>
 
-extern volatile uint32_t dbg_rx_evts;
-extern volatile uint32_t dbg_rx_errs;
 
 class EventTestApp : public Application {
 private:
@@ -36,7 +36,7 @@ public:
     const char* getAppName() override { return "MODEM_DIAG"; }
 
     Widget* buildUI() override {
-        snprintf(tick_str, sizeof(tick_str), "R:%lu E:%lu", dbg_rx_evts, dbg_rx_errs);
+        snprintf(tick_str, sizeof(tick_str), "R:%lu E:%lu", Uart::rxEvents(), Uart::rxErrors());
         snprintf(header_str, sizeof(header_str), "BLE:%s", strlen(GlobalStore.ble_status) > 0 ? GlobalStore.ble_status : "IDLE");
 
         NanoUI::EmbeddedVector<Widget*> items;
@@ -55,7 +55,7 @@ public:
         
         NanoUI::EmbeddedVector<Widget*> btn_row;
         btn_row.push_back(new Button(new Container(new Text("PING", 8), 40, 14, 0, true, 2), []() {
-            EventBus::publish("sys/bw/ping", "1");
+            CrabitLink::send(Topics::SysBwPing, "1");
             strcpy(GlobalStore.latest_notify, "TX: PING->BW16");
             if (WindowManager::instance) WindowManager::instance->markDirty();
         }));

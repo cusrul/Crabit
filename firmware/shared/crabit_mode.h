@@ -2,6 +2,7 @@
 #define CRABIT_MODE_H
 
 #include <stdint.h>
+#include "topics.h"
 
 // Pure coordination state shared by STM32 and BW16.  It carries intent and
 // liveness only; platform code remains responsible for the protected power
@@ -10,12 +11,12 @@ namespace CrabitMode {
 
 // CrabitWire topics reserved for coordination. Values are compact CSV or a
 // platform-defined status payload; they must not trigger hardware directly.
-static const char* const TOPIC_REQUEST = "mode/request";
-static const char* const TOPIC_GRANT = "mode/grant";
-static const char* const TOPIC_ACTIVE = "mode/active";
-static const char* const TOPIC_HEARTBEAT = "mode/heartbeat";
-static const char* const TOPIC_RELEASE = "mode/release";
-static const char* const TOPIC_STATUS = "mode/status";
+inline constexpr const char* TOPIC_REQUEST = Topics::ModeRequest;
+inline constexpr const char* TOPIC_GRANT = Topics::ModeGrant;
+inline constexpr const char* TOPIC_ACTIVE = Topics::ModeActive;
+inline constexpr const char* TOPIC_HEARTBEAT = Topics::ModeHeartbeat;
+inline constexpr const char* TOPIC_RELEASE = Topics::ModeRelease;
+inline constexpr const char* TOPIC_STATUS = Topics::ModeStatus;
 
 enum class Mode : uint8_t {
     WATCH_IDLE = 0,

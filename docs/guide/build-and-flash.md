@@ -3,7 +3,7 @@
 从GitHub全新克隆的前置配置、已测试工具版本和实际结果见[复现构建](../reproduction.md)。
 
 本文命令默认在仓库根目录执行，除非代码块先切换目录。这里只给出构建与检查流程；
-烧录、复位、进入下载模式和供电由设备操作者执行。没有选定稳定固件组合前，不提供一键刷写脚本。
+烧录、复位、进入下载模式和供电由设备操作者执行。下面的双区维护工具只适用于操作者已确认的镜像组合与恢复路径，不是通用稳定版刷机入口。
 
 ## 1. 先选源码和环境
 
@@ -116,6 +116,48 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-bw16-image.ps1 -
 
 `-Profile` 的其他 lab 配置只用于编译/占用测量，带 `DO_NOT_FLASH.txt`，不作为使用教程。
 它们的旧无线 App 没有获得本次共存设计的硬件验收。详见profile 记录。
+
+### 已验证板卡的双区维护入口
+
+维护者已确认双区方案可行；本地旧原型曾在 COM6/COM14 完成主区和扩展区写入与 checksum 校验。
+这些操作记录不等于所有游戏、无线共存或所有板卡已通过验收。
+可维护入口是 `tools/flash_bw16.py`，旧 `build/bw16-two-range-flash/` 原型保留作恢复参考。
+新入口增加了配对检查、有限超时与失败诊断；仅通过主机测试，尚未重新实机烧录。
+
+先进行离线检查（不开串口）：
+
+```powershell
+python tools/flash_bw16.py --main build/<本次构建>/stock-pack/km0_km4_image2.bin --extension build/<本次构建>/games-extension.bin --report build/<本次构建>/report.json
+```
+
+必须使用同一次 split 构建的主镜像、扩展镜像和报告；工具在打开串口前检查长度、地址和两个 SHA256，
+并持有已验证的字节快照，不会在擦除后重新读取可能被替换的文件。
+报告的 `status: PASS` 只表示构建证据，不会把 `flashable: false` 自动升级为硬件批准。
+上述 `build/` 文件不随 Git 克隆分发；可用 `tools/build_bw16_split_games.py` 在新的输出目录构建另一对。
+默认 flashloader 来自当前用户 `LOCALAPPDATA` 下的既有 AmebaD tools 1.1.3，可用 `--flashloader <path>` 指定已有文件；不会安装或改写 SDK。
+
+操作者进入烧录桥并按「开始烧录」后，可只读监听当前端口：
+
+```powershell
+python tools/flash_bw16.py --probe --port COMx --seconds 6
+```
+
+仅在明确授权本次设备操作后，使用同一对文件并追加：
+
+```text
+--execute --port COMx --retire-ota2
+```
+
+工具保留旧原型的协议字节与操作顺序：擦 OTA2 签名扇区 `[0x106000, 0x107000)`，
+擦写主区（从 `0x6000`、长度不超过 `0xF4000`），擦写扩展区 `[0x107000, 0x1F8000)`，
+最后分别校验主区与扩展区。中间 `[0xFA000, 0x106000)` 不写，boot 镜像不写；
+**OTA2 退役后没有 A/B 回退**。不得把两个 BIN 拼接成跨越保留区的连续镜像。
+工具固定使用主机端 115200，不协商或修改 STM32 的实际 UART 速率；适用性以已确认的桥和板卡为准。
+
+同步/普通 ACK/校验响应等待为 10 秒，擦除 ACK 为 120 秒，串口写超时为 10 秒；
+`--wait N` 在打开端口后、首次同步前等待 N 秒。超时或掉线不会自动重试、复位或切换供电。
+若已发出擦除命令，工具会提示 Flash 可能不完整，不能假定 BW16 可启动；
+由操作者重新进入 STM32 烧录桥，再用同一对镜像完整重写。写入校验通过后仍需手动退出桥接并检查实际运行。
 
 ## 6. Flutter 客户端
 

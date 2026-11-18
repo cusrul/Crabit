@@ -24,6 +24,8 @@ typedef struct {
     uint32_t NbPages;
 } FLASH_EraseInitTypeDef;
 
+typedef int HAL_StatusTypeDef;
+
 #define FLASH_TYPEERASE_PAGES 1u
 #define FLASH_BANK_1 1u
 #define FLASH_TYPEPROGRAM_DOUBLEWORD 2u
@@ -35,17 +37,27 @@ extern unsigned settings_flat_flash_erase_calls;
 extern unsigned settings_flat_flash_program_calls;
 extern unsigned settings_flat_program_fail_call;
 extern unsigned settings_flat_flash_lock_calls;
-extern uint8_t settings_flat_flash_image[56];
+extern unsigned settings_flat_flash_busy;
+extern uint8_t settings_flat_flash_image[64];
 extern int settings_flat_unlock_status;
 extern int settings_flat_lock_status;
 extern int settings_flat_erase_status;
 extern int settings_flat_program_status;
 
+// PMU stand-in for the read-only BW16 power check (AXP2101 register 0x80).
+extern uint8_t settings_flat_pmu_dc_onoff;
+extern int settings_flat_axp_read_status;
+extern "C" HAL_StatusTypeDef AXP2101_ReadReg(uint8_t reg, uint8_t* val);
+
 inline int HAL_FLASH_Unlock() { ++settings_flat_flash_unlock_calls; return settings_flat_unlock_status; }
 inline int HAL_FLASH_Lock() { ++settings_flat_flash_lock_calls; return settings_flat_lock_status; }
 inline int HAL_FLASHEx_Erase(FLASH_EraseInitTypeDef*, uint32_t* page_error) {
     ++settings_flat_flash_erase_calls;
-    if (settings_flat_erase_status == HAL_OK && page_error) *page_error = 0xFFFFFFFFu;
+    if (settings_flat_erase_status == HAL_OK) {
+        // The target page is erased to 0xFF before any doubleword is programmed.
+        std::memset(settings_flat_flash_image, 0xFF, sizeof(settings_flat_flash_image));
+        if (page_error) *page_error = 0xFFFFFFFFu;
+    }
     return settings_flat_erase_status;
 }
 inline int HAL_FLASH_Program(uint32_t, uint32_t address, uint64_t word) {

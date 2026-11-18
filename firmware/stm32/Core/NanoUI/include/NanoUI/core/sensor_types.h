@@ -35,17 +35,19 @@ struct SensorDataOptical : public SensorData {
 
 // 3. 电池 ADC 传感器
 struct SensorDataBattery : public SensorData {
-    float voltage;
-    int percent;
-    bool is_charging;
+    float voltage;        // 0 when voltage_valid is false.
+    int percent;          // 0..100, or -1 when the gauge reading is unknown.
+    bool is_charging;     // Meaningful only when charging_valid is true.
+    bool voltage_valid;   // A fresh, successful voltage read produced `voltage`.
+    bool charging_valid;  // A successful status read produced `is_charging`.
 };
 
 // 3b. AXP2101 PMU 复合数据
 struct SensorDataAXP2101 : public SensorData {
-    float voltage;
-    int percent;
+    float voltage;        // 0 when voltage_valid is false.
+    int percent;          // 0..100, or -1 when the gauge reading is unknown.
     int current;
-    bool is_charging;
+    bool is_charging;     // Meaningful only when charging_valid is true.
     bool is_vbus_in;
     float temp;
     float v_dcdc1;
@@ -54,6 +56,8 @@ struct SensorDataAXP2101 : public SensorData {
     float v_aldo1;
     float v_aldo2;
     float v_aldo3;
+    bool voltage_valid;   // A fresh, successful voltage read produced `voltage`.
+    bool charging_valid;  // A successful status read produced `is_charging`.
 };
 
 // 4. BMP280 气压计

@@ -11,9 +11,9 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-APP_HEADER = ROOT / "firmware/rtl8720dn/NanoUI/app/app_wifi_sniff.h"
-DIAGNOSTICS_HEADER = ROOT / "firmware/rtl8720dn/NanoUI/app/wifi_sniff_diagnostics.h"
-SNIFFER_HEADER = ROOT / "firmware/rtl8720dn/NanoUI/app/wifi_hack_sniffer.h"
+APP_HEADER = ROOT / "firmware/rtl8720dn/NanoUI/app/apps/wireless/app_wifi_sniff.h"
+DIAGNOSTICS_HEADER = ROOT / "firmware/rtl8720dn/NanoUI/app/core/wifi_sniff_diagnostics.h"
+SNIFFER_HEADER = ROOT / "firmware/rtl8720dn/NanoUI/app/core/wifi_hack_sniffer.h"
 
 STRIPPED_IMPORTS = {
     '#include "../src/NanoUI.h"',

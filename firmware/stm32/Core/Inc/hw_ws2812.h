@@ -6,7 +6,7 @@
 
 #if defined(USE_HAL_DRIVER) && defined(STM32L432xx)
 #include "tim.h"
-#include "led_rail_stop2.h"
+#include "power_policy.h"
 #endif
 
 static constexpr int LED_COUNT = 2;

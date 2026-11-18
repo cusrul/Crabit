@@ -7,7 +7,9 @@
 // STM32 product scheduling state, not a NanoUI or display-ownership API.
 // g_coproc_active separately records the existing physical OLED handover.
 namespace Crabit {
-enum class AmebaPhase : uint8_t { Inactive, Transition, Running };
+// AwaitUi enables the normal event pump (to receive UI_READY) while the
+// session still blocks STOP2; it is not a successful peer handover.
+enum class AmebaPhase : uint8_t { Inactive, Transition, Running, AwaitUi };
 extern std::atomic<AmebaPhase> ameba_phase;
 
 inline void setAmebaPhase(AmebaPhase phase) {

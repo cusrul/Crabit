@@ -10,7 +10,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCTION_HEADER = ROOT / "firmware/stm32/Core/Inc/hw_ws2812.h"
 FIRMWARE_INCLUDE = ROOT / "firmware/stm32/Core/Inc"
-LED_RAIL_HEADER = FIRMWARE_INCLUDE / "led_rail_stop2.h"
+LED_RAIL_HEADER = FIRMWARE_INCLUDE / "power_policy.h"
 CPP_FIXTURE = ROOT / "tools/tests/ws2812_diagnostics.cpp"
 FAKE_INCLUDE = ROOT / "tools/tests/ws2812_fakes"
 FAKE_TIM = FAKE_INCLUDE / "tim.h"

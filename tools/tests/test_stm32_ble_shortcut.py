@@ -19,7 +19,7 @@ class BleShortcutInputTests(unittest.TestCase):
 #include <cstdint>
 #include <cstdlib>
 #include <cmath>
-#include "idle_sleep_policy.h"
+#include "power_policy.h"
 #include "ble_shortcut_button.h"
 #include "product_preferences.h"
 enum EventType {EVT_NONE,EVT_UP,EVT_DOWN,EVT_LEFT,EVT_RIGHT,EVT_OK,EVT_BACK};
@@ -50,15 +50,18 @@ struct StmSensorSnapshot {
  struct {bool is_valid=false,lifted=true;int dx=0,dy=0;} optical;
 } snapshot;
 bool STM32_ReadSensorSnapshot(StmSensorSnapshot* out){*out=snapshot;return true;}
-namespace Crabit {unsigned toggles=0;void toggleBleFromUi(){++toggles;}}
+namespace Crabit {unsigned toggles=0;unsigned presses_at_toggle=0;}
+void onShortcut(){++Crabit::toggles;Crabit::presses_at_toggle=InputFeedback::presses;}
+extern "C" { volatile uint8_t crabit_pat_hold = 0; }
 """
             + extract_function(source, "class STM32Input : public InputDriver")
             + r""";
 int main(){
- STM32Input input;input.init();
+ STM32Input input;input.setBleShortcutHandler(onShortcut);input.init();
  up=true;now=1001;assert(input.poll().type==EVT_NONE);
  now=2000;assert(input.poll().type==EVT_NONE && Crabit::toggles==0);
  now=2001;assert(input.poll().type==EVT_NONE && Crabit::toggles==1);
+ assert(Crabit::presses_at_toggle==InputFeedback::presses);
  now=3200;assert(input.poll().type==EVT_NONE && Crabit::toggles==1);
  up=false;now=3500;assert(input.poll().type==EVT_NONE);
  up=true;now=4000;assert(input.poll().type==EVT_NONE);
@@ -110,6 +113,28 @@ int main(){
   assert(!CrabitPreferences::enabled(CrabitPreferences::Pat));
   assert(!CrabitPreferences::enabled(CrabitPreferences::Qmi));
   assert(InputFeedback::presses==feedback_before+3);
+  // A missing UI hook is safe: the hold still feeds back but does nothing else.
+  STM32Input unbound;
+  const unsigned toggles_before_unbound=Crabit::toggles;
+  const unsigned presses_before_unbound=InputFeedback::presses;
+  up=down=ok=false;now=20000;unbound.init();
+  up=true;now=20010;assert(unbound.poll().type==EVT_NONE);
+  now=21010;assert(unbound.poll().type==EVT_NONE && Crabit::toggles==toggles_before_unbound);
+  assert(InputFeedback::presses==presses_before_unbound+1);
+  up=false;now=21100;unbound.poll();
+  // Registering once survives init()/resetAfterWake(); one hold fires exactly once.
+  STM32Input rebound;rebound.setBleShortcutHandler(onShortcut);
+  up=down=ok=false;now=24000;rebound.init();
+  rebound.resetAfterWake();now=24300;assert(rebound.poll().type==EVT_NONE);
+  const unsigned toggles_before_rebound=Crabit::toggles;
+  const unsigned presses_before_rebound=InputFeedback::presses;
+  up=true;now=24400;assert(rebound.poll().type==EVT_NONE);
+  now=25399;assert(rebound.poll().type==EVT_NONE && Crabit::toggles==toggles_before_rebound);
+  now=25400;assert(rebound.poll().type==EVT_NONE && Crabit::toggles==toggles_before_rebound+1);
+  assert(Crabit::presses_at_toggle==InputFeedback::presses);
+  assert(InputFeedback::presses==presses_before_rebound+1);
+  up=false;now=25500;rebound.poll();
+  assert(Crabit::toggles==toggles_before_rebound+1);
 }
 """
         )

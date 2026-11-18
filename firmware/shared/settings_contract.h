@@ -2,6 +2,7 @@
 #define CRABIT_SETTINGS_CONTRACT_H
 
 #include "crabit_wire.h"
+#include "topics.h"
 #include <stdio.h>
 
 // ASCII key/value contract, deliberately safe through the existing BW16 JSON
@@ -11,8 +12,8 @@
 // firmware did not implement that behavior. The wire format is unchanged.
 // Unknown/duplicate/empty fields fail atomically.
 namespace CrabitSettings {
-static const char READ_TOPIC[] = "sys/settings";
-static const char SET_TOPIC[] = "sys/settings/set";
+inline constexpr const char* READ_TOPIC = Topics::SysSettings;
+inline constexpr const char* SET_TOPIC = Topics::SysSettingsSet;
 static const uint32_t MAX_DELAY_MS = 86400000; // 24h; avoids power sum overflow
 enum Field : uint8_t { Brightness = 1, Invert = 2, ScreenOff = 4, DeepSleep = 8 };
 struct Patch {

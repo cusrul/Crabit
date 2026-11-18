@@ -4,12 +4,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "idle_sleep_policy.h"
-#include "mcu_stop2_sequence.h"
-#include "wake_metrics.h"
-#include "qmi_wake_trace.h"
-#include "wake_history.h"
-#include "wake_core_trace.h"
+#include "power_policy.h"
+#include "wake_log.h"
 
 using HAL_StatusTypeDef = enum { HAL_OK = 0, HAL_ERROR = 1 };
 
@@ -146,18 +142,18 @@ void clearSensor();
 void publishImu(uint32_t timestamp, bool valid, float ax, float ay, float az);
 }  // namespace screen_power_fake
 
-namespace McuStop2 {
-inline Reason blocked_reason = Reason::None;
-inline Result next_result{Reason::Qmi, true, 1, 80000000};
-class WatchPort {
+namespace screen_power_fake {
+inline Stop2::Reason blocked_reason = Stop2::Reason::None;
+inline Stop2::Result next_result{Stop2::Reason::Qmi, true, 1, 80000000};
+}  // namespace screen_power_fake
+class Stop2::WatchPort {
    public:
-    Reason blocked() { return blocked_reason; }
+    Stop2::Reason blocked() { return screen_power_fake::blocked_reason; }
 };
-inline Result runWatch() {
+inline Stop2::Result Stop2::runWatch() {
     screen_power_fake::record("stop2");
-    return next_result;
+    return screen_power_fake::next_result;
 }
-}  // namespace McuStop2
 inline void STM32_ResetInputAfterWake() {
     screen_power_fake::record("input_reset");
 }
@@ -187,6 +183,13 @@ HAL_StatusTypeDef AXP2101_EnterLowPower(I2C_HandleTypeDef* handle);
 HAL_StatusTypeDef AXP2101_ExitLowPower(I2C_HandleTypeDef* handle);
 void OLED_SetSleep(bool sleep);
 void OLED_WR_Byte(uint8_t value, uint8_t command);
+
+class Display {
+public:
+    static void setBrightness(float) { OLED_WR_Byte(0, 0); OLED_WR_Byte(0, 0); }
+    static void setInvert(bool) { OLED_WR_Byte(0, 0); }
+    static void setSleep(bool sleep) { OLED_SetSleep(sleep); }
+};
 
 #define __HAL_GPIO_EXTI_CLEAR_IT(pin) HAL_GPIO_ClearExti(pin)
 #define __HAL_PWR_CLEAR_FLAG(flag) HAL_PWR_ClearFlag(flag)

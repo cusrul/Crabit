@@ -15,9 +15,9 @@ class BuildReproductionTests(unittest.TestCase):
         self.assertIn("SLA0044 Rev6/October 2025", st_license)
         self.assertIn("exclusively on or in combination", st_license)
         for relative, owner in (
-            ("app/castle_boy/LICENSE", "2016 dir3kt"),
-            ("app/arduboy3d/LICENSE", "James Howard"),
-            ("app/LICENSE-Hopper.txt", "OBONO"),
+            ("app/apps/games/castle_boy/LICENSE", "2016 dir3kt"),
+            ("app/apps/games/arduboy3d/LICENSE", "James Howard"),
+            ("app/apps/games/hopper/LICENSE", "OBONO"),
         ):
             text = (ROOT / "firmware/rtl8720dn/NanoUI" / relative).read_text(encoding="utf-8")
             self.assertIn(owner, text)

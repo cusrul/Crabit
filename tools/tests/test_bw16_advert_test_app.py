@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class AdvertAppTests(unittest.TestCase):
     def test_default_stop_busy_start_stop_exit_and_timeout(self):
-        app = (ROOT / "firmware/rtl8720dn/NanoUI/app/app_ble_advert_test.h").read_text()
+        app = (ROOT / "firmware/rtl8720dn/NanoUI/app/apps/wireless/app_ble_advert_test.h").read_text()
         app = re.sub(r"^#include[^\n]*", "", app, flags=re.M)
         fixture = (
             r"""

@@ -33,6 +33,17 @@
 #ifndef CRABIT_BW16_NETWORK_TWO_GAMES
 #define CRABIT_BW16_NETWORK_TWO_GAMES 0
 #endif
+// Additional Arduboy ports are opt-in for the isolated split-Flash experiment.
+// This switch does NOT install a linker layout or make an image safe to upload.
+#ifndef CRABIT_BW16_ARDUBOY_PORTS
+#define CRABIT_BW16_ARDUBOY_PORTS 0
+#endif
+#if (CRABIT_BW16_ARDUBOY_PORTS != 0) && (CRABIT_BW16_ARDUBOY_PORTS != 1)
+#error "Invalid Arduboy ports selection"
+#endif
+#if CRABIT_BW16_ARDUBOY_PORTS && (CRABIT_BW16_PROFILE != CRABIT_BW16_PROFILE_WIFI_TOOLS_LAB)
+#error "Arduboy ports trial requires wifi-tools-lab"
+#endif
 #ifndef CRABIT_BW16_NETWORK_GAME
 #ifdef CRABIT_BW16_IDE_HOPPER_TRIAL
 #define CRABIT_BW16_NETWORK_GAME 2

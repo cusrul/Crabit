@@ -1,4 +1,5 @@
 import ast
+import io
 import json
 from pathlib import Path
 import struct
@@ -11,7 +12,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nanoui_tools.config import DEFAULT_FONTS, LIBRARY_ROOT, load_config
-from nanoui_tools.fonts import build_fonts, FONT_CPP_MARKER
+from nanoui_tools.fonts import build_fonts, generate_font_blocks, scan_config, FONT_CPP_MARKER
 from nanoui_tools.glyphs import BDFParser
 from nanoui_tools.media import pack_bitmap, export_media
 from nanoui_tools.output import replace_outputs
@@ -213,6 +214,148 @@ class ResourceTests(unittest.TestCase):
         chars, _, _ = scan_project([app])
         self.assertIn("中", chars)
 
+    def test_nested_generation_backup_and_example_trees_are_skipped(self):
+        app = self.root / "App"
+        ignored = {
+            "generated/one.h": "生成",
+            "build/two.h": "构建",
+            "examples/three.h": "示例",
+            "backup/four.h": "备份",
+            "Backups/five.h": "旧备",
+            "legacy.bak/six.h": "旧字",
+            "myBackup/seven.h": "陈旧",
+        }
+        for relative, text in ignored.items():
+            path = app / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f'new Text("{text}", 12);', encoding="utf-8")
+        (app / "old.cpp.bak").write_text('new Text("旧件", 12);', encoding="utf-8")
+        (app / "backup.cpp").write_text('new Text("保留", 12);', encoding="utf-8")
+        (app / "main.h").write_text('new Text("应用", 12);', encoding="utf-8")
+
+        chars, _, _ = scan_project([app])
+        self.assertIn("应", chars)
+        self.assertIn("保", chars)
+        for text in [*ignored.values(), "旧件"]:
+            for char in text:
+                self.assertNotIn(char, chars)
+
+        # An explicitly selected nested directory is the root, so its own
+        # name is not treated as an exclusion.
+        for relative, text in (("examples", "示例"), ("build", "构建")):
+            chars, _, _ = scan_project([app / relative])
+            for char in text:
+                self.assertIn(char, chars)
+
+    def test_unified_entry_checks_and_generates_without_tkinter(self):
+        from resource_gui import main
+
+        config = load_config(self.path)
+        with patch.dict(sys.modules, {"tkinter": None}):
+            with patch("sys.stdout", new_callable=io.StringIO) as output:
+                self.assertEqual(main(["--config", str(self.path), "check"]), 0)
+            self.assertFalse(config.output_cpp.exists())
+            self.assertFalse(config.output_h.exists())
+            self.assertIn('"written": false', output.getvalue())
+            with patch("sys.stdout", new_callable=io.StringIO):
+                self.assertEqual(main(["--config", str(self.path), "fonts"]), 0)
+        with patch("resource_gui.launch_gui", return_value=0) as launch:
+            self.assertEqual(main(["--config", str(self.path), "images"]), 0)
+            launch.assert_called_once()
+        self.assertTrue(config.output_cpp.exists())
+
+    def test_unified_entry_errors_are_actionable(self):
+        from resource_gui import main, launch_gui
+
+        with patch.dict(sys.modules, {"tkinter": None}):
+            for args in ([], ["gui"], ["--config", str(self.path), "images"]):
+                with (
+                    self.subTest(args=args),
+                    patch("sys.stderr", new_callable=io.StringIO) as error,
+                ):
+                    self.assertEqual(main(args), 1)
+                    self.assertIn("needs Tkinter", error.getvalue())
+        with patch("sys.stderr", new_callable=io.StringIO) as error:
+            self.assertEqual(main(["--config", str(self.root / "missing.json"), "check"]), 1)
+            self.assertIn("Cannot read project config", error.getvalue())
+        with patch("sys.stderr", new_callable=io.StringIO):
+            with self.assertRaises(SystemExit) as error:
+                main(["check"])
+            self.assertEqual(error.exception.code, 2)
+        import types
+
+        class NoDisplayError(Exception):
+            pass
+
+        fake_tk = types.SimpleNamespace(TclError=NoDisplayError)
+
+        def no_display():
+            raise NoDisplayError("no display")
+
+        with (
+            patch.dict(sys.modules, {"tkinter": fake_tk}),
+            patch("sys.stderr", new_callable=io.StringIO) as error,
+        ):
+            self.assertEqual(launch_gui(no_display), 1)
+            self.assertIn("cannot open a display", error.getvalue())
+
+    def test_font_provider_path_cannot_replace_an_output(self):
+        with self.assertRaisesRegex(ValueError, "provider collides"):
+            self.write_config(output_cpp="generated/nanoui_font_provider.cpp")
+
+    def test_checked_in_resource_outputs_are_distinct(self):
+        repo = LIBRARY_ROOT.parents[1]
+        if not (repo / "firmware/rtl8720dn/NanoUI/nanoui-assets.json").is_file():
+            self.skipTest("Crabit product resource configs are not present")
+        configs = (
+            "firmware/stm32/Core/NanoUI/nanoui-assets.json",
+            "firmware/stm32/Core/NanoUI/platforms/desktop/nanoui-assets.json",
+            "firmware/rtl8720dn/NanoUI/nanoui-assets.json",
+            "firmware/rtl8720dn/NanoUI/nanoui-assets.examples.json",
+            "firmware/rtl8720dn/NanoUI/nanoui-assets.product.json",
+            "firmware/rtl8720dn/NanoUI/nanoui-network-assets.json",
+            "libraries/NanoUI/examples/FirstApp/nanoui-assets.json",
+        )
+        owners = {}
+        for relative in configs:
+            config = load_config(repo / relative)
+            paths = [config.output_h, config.output_cpp]
+            if config.font_provider:
+                paths.append(config.provider_path)
+            for path in paths:
+                self.assertNotIn(path, owners, f"{relative} overwrites {owners.get(path)}")
+                owners[path] = relative
+        examples = load_config(repo / configs[3])
+        self.assertEqual(
+            examples.output_cpp.parent, (repo / "build/font-examples-candidate").resolve()
+        )
+        # Example generation must not write inside either product's scanned
+        # source roots, even if its filenames differ from product outputs.
+        for relative in (configs[0], configs[2]):
+            product = load_config(repo / relative)
+            for output in (examples.output_h, examples.output_cpp):
+                for root in product.sources:
+                    self.assertFalse(output.is_relative_to(root), f"{output} enters {root}")
+
+    def test_checked_in_product_font_blocks_regenerate_identically(self):
+        repo = LIBRARY_ROOT.parents[1]
+        if not (repo / "firmware/stm32/Core/NanoUI/nanoui-assets.json").is_file():
+            self.skipTest("Crabit product resource configs are not present")
+        for relative, expected in (
+            ("firmware/stm32/Core/NanoUI/nanoui-assets.json", 1083),
+            ("firmware/rtl8720dn/NanoUI/nanoui-assets.json", 891),
+        ):
+            with self.subTest(config=relative):
+                config = load_config(repo / relative)
+                chars, art, sizes = scan_config(config)
+                _, generated, count, _ = generate_font_blocks(config, chars, art, sizes)
+                self.assertEqual(count, expected)
+                source = config.output_cpp.read_text(encoding="utf-8")
+                self.assertEqual(
+                    source.split(FONT_CPP_MARKER, 1)[1],
+                    generated.split(FONT_CPP_MARKER, 1)[1],
+                )
+
     def test_cooperation_and_determinism(self):
         config = load_config(self.path)
         report = build_fonts(config)
@@ -300,13 +443,22 @@ class ResourceTests(unittest.TestCase):
 
     def test_original_bdf_bytes_on_both_alignment_profiles(self):
         repo = Path(__file__).resolve().parents[4]
+        baseline = "9525ab9"
         if not (repo / ".git").exists():
             self.skipTest("Historical byte comparison requires the Crabit Git baseline")
+        available = subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", f"{baseline}^{{commit}}"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+        )
+        if available.returncode != 0:
+            self.skipTest(f"pinned development revision {baseline} is not present in this clone")
         for path, alignment in [
             ("firmware/stm32/Core/NanoUI/tools/font_builder.py", "baseline"),
             ("firmware/rtl8720dn/NanoUI/tools/font_builder.py", "center"),
         ]:
-            source = subprocess.check_output(["git", "show", "9525ab9:" + path], cwd=repo).decode(
+            source = subprocess.check_output(["git", "show", f"{baseline}:" + path], cwd=repo).decode(
                 "utf-8-sig"
             )
             node = next(

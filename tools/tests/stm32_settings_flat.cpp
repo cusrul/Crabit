@@ -29,14 +29,21 @@ unsigned settings_flat_flash_erase_calls = 0;
 unsigned settings_flat_flash_program_calls = 0;
 unsigned settings_flat_program_fail_call = 0;
 unsigned settings_flat_flash_lock_calls = 0;
-uint8_t settings_flat_flash_image[56]{};
+unsigned settings_flat_flash_busy = 0;
+uint8_t settings_flat_flash_image[64]{};
 static_assert(sizeof(SystemConfig) == 48, "the legacy configuration image remains 48 bytes");
-static_assert(sizeof(settings_flat_flash_image) == 48 + sizeof(CrabitPreferences::Record),
-              "the optional preference trailer follows the unchanged legacy image");
+static_assert(sizeof(settings_flat_flash_image) ==
+                  48 + sizeof(CrabitPreferences::Record) + sizeof(Crabit::Bw16Voltage::Record),
+              "the optional trailers follow the unchanged legacy image");
 int settings_flat_unlock_status = HAL_OK;
 int settings_flat_lock_status = HAL_OK;
 int settings_flat_erase_status = HAL_OK;
 int settings_flat_program_status = HAL_OK;
+// AXP2101_Init leaves register 0x80 at 0x01: DCDC1 on, DCDC3 (BW16) off.
+uint8_t settings_flat_pmu_dc_onoff = 0x01;
+int settings_flat_axp_read_status = HAL_OK;
+volatile bool g_coproc_active = false;
+std::atomic<Crabit::AmebaPhase> Crabit::ameba_phase(Crabit::AmebaPhase::Inactive);
 unsigned settings_flat_oled_calls = 0;
 uint8_t settings_flat_oled_bytes[512]{};
 uint8_t settings_flat_oled_commands[512]{};
@@ -47,6 +54,87 @@ extern "C" void OLED_WR_Byte(uint8_t data, uint8_t command) {
         settings_flat_oled_commands[settings_flat_oled_calls] = command;
     }
     ++settings_flat_oled_calls;
+}
+
+// PMU read used only by the BW16 power-off proof.
+extern "C" HAL_StatusTypeDef AXP2101_ReadReg(uint8_t reg, uint8_t* value) {
+    if (settings_flat_axp_read_status != HAL_OK) return settings_flat_axp_read_status;
+    if (value) *value = reg == AXP2101_DC_ONOFF_DVM_CTRL ? settings_flat_pmu_dc_onoff : 0xFF;
+    return HAL_OK;
+}
+
+// The two display preview commands the page actually uses. The command bytes
+// mirror the real display.cpp implementation; only the transport is mocked.
+void Display::setBrightness(float brightness) {
+    if (!(brightness >= 0.0f && brightness <= 1.0f)) return;
+    OLED_WR_Byte(0x81, 0);
+    OLED_WR_Byte(static_cast<uint8_t>(brightness * 255.0f), 0);
+    OLED_WR_Byte(0xD9, 0);
+    OLED_WR_Byte(brightness < 0.15f ? 0x11 : 0x22, 0);
+    OLED_WR_Byte(0xDB, 0);
+    OLED_WR_Byte(brightness < 0.15f ? 0x00 : 0x20, 0);
+}
+
+void Display::setInvert(bool invert) { OLED_WR_Byte(invert ? 0xA7 : 0xA6, 0); }
+
+// Host FlashStore double: same transaction order, erase/program/lock mapping and
+// doubleword program loop as the target, backed by the fixture's fake page.
+bool FlashStore::init() { return true; }
+void* FlashStore::mutex_ = nullptr;
+FlashStore::Transaction::Transaction(uint32_t) {
+    if (settings_flat_flash_busy) return;
+    entered_ = true;
+    if (HAL_FLASH_Unlock() != HAL_OK) result_ = Result::Unlock;
+}
+FlashStore::Transaction::~Transaction() { close(); }
+FlashStore::Result FlashStore::Transaction::erasePages(uint32_t first_page, uint32_t count) {
+    if (!entered_ || result_ != Result::Ok) return result_;
+    FLASH_EraseInitTypeDef erase{};
+    erase.TypeErase = FLASH_TYPEERASE_PAGES;
+    erase.Banks = FLASH_BANK_1;
+    erase.Page = first_page;
+    erase.NbPages = count;
+    uint32_t page_error = 0xFFFFFFFFu;
+    if (HAL_FLASHEx_Erase(&erase, &page_error) != HAL_OK || page_error != 0xFFFFFFFFu)
+        result_ = Result::Erase;
+    return result_;
+}
+FlashStore::Result FlashStore::Transaction::program(uint32_t address, const void* data,
+                                                    size_t length) {
+    if (!entered_ || result_ != Result::Ok) return result_;
+    if ((address & 7u) != 0 || (data == nullptr && length != 0)) {
+        result_ = Result::Program;
+        return result_;
+    }
+    const uint8_t* bytes = static_cast<const uint8_t*>(data);
+    for (size_t offset = 0; offset < length; offset += 8) {
+        uint64_t word = 0xFFFFFFFFFFFFFFFFull;
+        const size_t chunk = (length - offset < 8) ? length - offset : 8;
+        std::memcpy(&word, bytes + offset, chunk);
+        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, address + offset, word) != HAL_OK) {
+            result_ = Result::Program;
+            break;
+        }
+    }
+    return result_;
+}
+FlashStore::Result FlashStore::Transaction::close() {
+    if (closed_) return result_;
+    closed_ = true;
+    if (entered_) {
+        if (HAL_FLASH_Lock() != HAL_OK && result_ == Result::Ok) result_ = Result::Lock;
+    } else if (result_ == Result::Ok) {
+        result_ = Result::Busy;
+    }
+    return result_;
+}
+FlashStore::Result FlashStore::read(uint32_t address, void* data, size_t length) {
+    if (data == nullptr && length != 0) return Result::Program;
+    constexpr uint32_t base = 0x0803F800u;
+    if (address < base || address + length > base + sizeof(settings_flat_flash_image))
+        return Result::Program;
+    std::memcpy(data, settings_flat_flash_image + address - base, length);
+    return Result::Ok;
 }
 
 class TestHeap final : public NanoUI::MemoryAdapter {
@@ -132,6 +220,10 @@ static void frame(WindowManager& wm, unsigned count = 1) {
 static void checked(bool condition, const char* message) {
     require(condition, message);
     ++assertions;
+}
+
+static bool toastIs(const char* message) {
+    return Popup::toastMsg && std::strcmp(Popup::toastMsg, message) == 0;
 }
 
 static void snapshot(const BitmapCanvas& canvas, const std::string& dir,
@@ -280,12 +372,12 @@ int main(int argc, char** argv) {
     const std::vector<uint8_t> initialPixels(canvas.pixels, canvas.pixels + sizeof canvas.pixels);
     snapshot(canvas, snapshotDir, "initial");
     checked(dynamic_cast<RenderSlider*>(focus(wm)) != nullptr, "reopened focus starts at brightness");
-    moveFocus(wm, 13);
-    checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "focus index 13 is APPLY");
+    moveFocus(wm, 14);
+    checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "focus index 14 is APPLY");
     snapshot(canvas, snapshotDir, "actions_bottom");
     checked(std::equal(initialPixels.begin(), initialPixels.begin() + 128 * 12,
                        canvas.pixels), "fixed title/header pixels remain stationary while scrolling");
-    movePrevious(wm, 11); // APPLY -> face/BLE/inputs/deep sleep -> screen off
+    movePrevious(wm, 12); // APPLY -> voltage/face/BLE/inputs/deep sleep -> screen off
     checked(dynamic_cast<RenderSettingsOptionPicker*>(focus(wm)) != nullptr,
             "focus index 2 is the screen-off picker");
     send(wm, EVT_OK);
@@ -307,7 +399,7 @@ int main(int argc, char** argv) {
     checked(!*patSwitch->value && CrabitPreferences::enabled(CrabitPreferences::Pat),
             "PAT stays a draft until Apply");
     snapshot(canvas, snapshotDir, "input_editing");
-    moveFocus(wm, 9); // PAT -> QMI -> lift -> tap -> sound -> volume -> LED -> level -> BLE -> face -> APPLY
+    moveFocus(wm, 10); // PAT -> QMI -> lift -> tap -> sound -> volume -> LED -> level -> face -> voltage -> APPLY
     checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "focus index 14 is APPLY after the input rows");
     checked(wm.getStackSize() == anchorPages + 1, "toast does not push a WM page");
     const SystemConfig unrelatedBeforeApply = sys_cfg;
@@ -333,8 +425,8 @@ int main(int argc, char** argv) {
     frame(wm, 2);
     checked(std::strcmp(Popup::toastMsg, "已应用") == 0, "retry toast confirms successful save");
     checked(settings_flat_flash_unlock_calls == 2 && settings_flat_flash_erase_calls == 2 &&
-            settings_flat_flash_program_calls == 14 && settings_flat_flash_lock_calls == 2,
-            "retry rewrites six legacy words and one preference trailer word");
+            settings_flat_flash_program_calls == 15 && settings_flat_flash_lock_calls == 2,
+            "retry rewrites six legacy words and both local trailers");
     checked(sys_cfg.screen_off_ms == 3000 && sys_cfg.deep_sleep_ms == 7777,
             "apply changes selected timeout and preserves unknown sleep value");
     checked(sys_cfg.invert_disp && sys_cfg.brightness == 0.5f,
@@ -371,7 +463,7 @@ int main(int argc, char** argv) {
     send(wm, EVT_OK);
     checked(std::strcmp(Popup::toastMsg, "没有修改") == 0, "unchanged Apply reports no changes");
     checked(settings_flat_flash_unlock_calls == 2 && settings_flat_flash_erase_calls == 2 &&
-            settings_flat_flash_program_calls == 14 && settings_flat_flash_lock_calls == 2,
+            settings_flat_flash_program_calls == 15 && settings_flat_flash_lock_calls == 2,
             "unchanged Apply does not save");
     frame(wm, 100); // advance actual toast clock past its 1500 ms lifetime
     checked(Popup::toastMsg == nullptr, "actual toast expires after mocked UI ticks advance");
@@ -389,16 +481,16 @@ int main(int argc, char** argv) {
     moveFocus(wm, 1);
     checked(dynamic_cast<RenderSwitch*>(focus(wm)) != nullptr, "reopened committed page reaches invert second");
     send(wm, EVT_OK); // true -> false draft
-    moveFocus(wm, 12); // invert -> screen-off -> deep sleep/PAT/QMI/lift/tap/sound/volume/LED/level/BLE/face -> APPLY
+    moveFocus(wm, 13); // invert -> screen-off -> deep sleep/PAT/QMI/lift/tap/sound/volume/LED/level/face/voltage -> APPLY
     checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "reopened page reaches focus index 14 APPLY");
     send(wm, EVT_OK);
     frame(wm, 2);
     checked(sys_cfg.screen_off_ms == 4321 && sys_cfg.deep_sleep_ms == 7777,
             "editing invert and applying preserves both unknown timeout values");
     checked(!sys_cfg.invert_disp && settings_flat_flash_unlock_calls == 3 &&
-            settings_flat_flash_program_calls == 21,
+            settings_flat_flash_program_calls == 23,
             "second changed Apply commits invert through one more save");
-    movePrevious(wm, 12); // APPLY -> invert
+    movePrevious(wm, 13); // APPLY -> invert
     send(wm, EVT_OK); // new preview after the successful Apply
     checked(sys_cfg.invert_disp == false && settings_flat_oled_bytes[settings_flat_oled_calls - 1] == 0xA7,
             "post-Apply invert preview remains a draft");
@@ -416,11 +508,11 @@ int main(int argc, char** argv) {
     frame(wm, 3);
     moveFocus(wm, 1); // invert
     send(wm, EVT_OK);
-    moveFocus(wm, 12); // invert -> ... -> APPLY
+    moveFocus(wm, 13); // invert -> ... -> APPLY
     send(wm, EVT_OK);
     checked(sys_cfg.screen_off_ms == 0 && sys_cfg.deep_sleep_ms == 0,
             "unrelated invert Apply preserves both stored zero timeout values");
-    checked(settings_flat_flash_unlock_calls == 4 && settings_flat_flash_program_calls == 28,
+    checked(settings_flat_flash_unlock_calls == 4 && settings_flat_flash_program_calls == 31,
             "zero-preserving invert Apply makes one save");
     send(wm, EVT_BACK);
     frame(wm, 2);
@@ -440,14 +532,14 @@ int main(int argc, char** argv) {
     checked(sys_cfg.deep_sleep_ms == 0, "disabled deep sleep remains zero while navigating");
     moveFocus(wm, 1); // deep sleep -> PAT
     checked(dynamic_cast<RenderSwitch*>(focus(wm)) != nullptr, "focus index 4 is PAT");
-    moveFocus(wm, 9); // PAT -> QMI/lift/tap/sound/volume/LED/level/BLE/face/APPLY
+    moveFocus(wm, 10); // PAT -> QMI/lift/tap/sound/volume/LED/level/face/voltage/APPLY
     checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "zero-valued screen-off reaches APPLY");
     send(wm, EVT_OK);
     checked(sys_cfg.screen_off_ms == 3000,
             "Never can be changed back to a finite screen-off timeout");
     checked(sys_cfg.deep_sleep_ms == 0,
             "screen-off Apply preserves the legacy deep-sleep value without a picker");
-    checked(settings_flat_flash_unlock_calls == 5 && settings_flat_flash_program_calls == 35,
+    checked(settings_flat_flash_unlock_calls == 5 && settings_flat_flash_program_calls == 39,
             "time option apply makes one additional save");
     send(wm, EVT_BACK);
     frame(wm, 2);
@@ -461,7 +553,7 @@ int main(int argc, char** argv) {
     moveFocus(wm, 1);
     checked(*static_cast<RenderSwitch*>(focus(wm))->value,
             "reopened invert switch reflects applied value");
-    moveFocus(wm, 12);
+    moveFocus(wm, 13);
     checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "focus reaches APPLY from invert");
     moveFocus(wm, 1);
     checked(dynamic_cast<RenderButton*>(focus(wm)) != nullptr, "BACK follows APPLY in the action row");
@@ -483,7 +575,7 @@ int main(int argc, char** argv) {
     frame(wm, 3);
     moveFocus(wm, 12);
     checked(dynamic_cast<RenderSettingsOptionPicker*>(focus(wm)) != nullptr,
-            "focus index 13 is the face picker");
+            "focus index 12 is the face picker");
     send(wm, EVT_OK); send(wm, EVT_LEFT); send(wm, EVT_OK);
     checked(sys_cfg.watch_face == 0, "face edit remains a draft");
     send(wm, EVT_BACK);
@@ -493,10 +585,10 @@ int main(int argc, char** argv) {
     frame(wm, 3);
     moveFocus(wm, 12);
     send(wm, EVT_OK); send(wm, EVT_LEFT); send(wm, EVT_OK);
-    moveFocus(wm, 1); send(wm, EVT_OK);
+    moveFocus(wm, 2); send(wm, EVT_OK);
     checked(sys_cfg.watch_face == Crabit::watchFaceCount - 1 &&
             settings_flat_flash_unlock_calls == before_face_save + 1 &&
-            settings_flat_flash_program_calls == 42,
+            settings_flat_flash_program_calls == 47,
             "face Apply writes through existing config save exactly once");
     SystemConfig committed = sys_cfg;
     sys_cfg = SystemConfig{};
@@ -508,6 +600,388 @@ int main(int argc, char** argv) {
     ConfigManager::normalizeWatchFace();
     checked(sys_cfg.watch_face == 0, "invalid stored face falls back to classic");
     send(wm, EVT_BACK);
+    frame(wm, 2);
+
+    // ---- BW16 target voltage: local trailer only, never a UI-time PMU write ----
+    auto storedVoltage = []() {
+        Crabit::Bw16Voltage::Record record{};
+        std::memcpy(&record,
+                    settings_flat_flash_image + sizeof(SystemConfig) +
+                        sizeof(CrabitPreferences::Record),
+                    sizeof(record));
+        return record;
+    };
+    ConfigManager::load();
+    checked(Crabit::Bw16Voltage::targetMv() == 3000,
+            "saved default voltage record loads as 3.0V");
+
+    // Only magic + version + range + checksum records are trusted.
+    Crabit::Bw16Voltage::Record probe = Crabit::Bw16Voltage::sealed();
+    probe.code = Crabit::Bw16Voltage::level_count;
+    Crabit::Bw16Voltage::load(probe);
+    checked(Crabit::Bw16Voltage::targetMv() == 3000,
+            "out-of-range voltage record falls back to 3.0V");
+    probe = Crabit::Bw16Voltage::sealed();
+    probe.version = 2;
+    Crabit::Bw16Voltage::load(probe);
+    checked(Crabit::Bw16Voltage::targetMv() == 3000,
+            "old voltage record version falls back to 3.0V");
+    probe = Crabit::Bw16Voltage::sealed();
+    probe.checksum ^= 0x01;
+    Crabit::Bw16Voltage::load(probe);
+    checked(Crabit::Bw16Voltage::targetMv() == 3000,
+            "corrupt voltage checksum falls back to 3.0V");
+    probe = Crabit::Bw16Voltage::sealed();
+    probe.magic = 0;
+    Crabit::Bw16Voltage::load(probe);
+    checked(Crabit::Bw16Voltage::targetMv() == 3000,
+            "missing voltage magic falls back to 3.0V");
+    probe = Crabit::Bw16Voltage::sealed();
+    probe.reserved = 1;
+    Crabit::Bw16Voltage::load(probe);
+    checked(Crabit::Bw16Voltage::targetMv() == 3000,
+            "reserved voltage bits fall back to 3.0V");
+    Crabit::Bw16Voltage::Record truncated{};
+    std::memset(&truncated, 0xFF, sizeof(truncated));
+    truncated.magic = Crabit::Bw16Voltage::MAGIC;
+    Crabit::Bw16Voltage::load(truncated);
+    checked(Crabit::Bw16Voltage::targetMv() == 3000,
+            "truncated voltage record falls back to 3.0V");
+    Crabit::Bw16Voltage::Record erased{};
+    std::memset(&erased, 0xFF, sizeof(erased));
+    Crabit::Bw16Voltage::load(erased);
+    checked(Crabit::Bw16Voltage::targetMv() == 3000,
+            "erased voltage trailer falls back to 3.0V");
+    for (uint8_t code = 0; code < Crabit::Bw16Voltage::level_count; ++code) {
+        Crabit::Bw16Voltage::Record level{};
+        level.code = code;
+        level.checksum = Crabit::Bw16Voltage::checksum(level);
+        Crabit::Bw16Voltage::load(level);
+        checked(Crabit::Bw16Voltage::targetMv() == Crabit::Bw16Voltage::levels[code],
+                "each stored code maps to its 3.0/3.1/3.2V level");
+    }
+    checked(!Crabit::Bw16Voltage::setIndex(Crabit::Bw16Voltage::level_count),
+            "a fourth level can never reach the power call");
+    Crabit::Bw16Voltage::load(Crabit::Bw16Voltage::Record{});
+    ConfigManager::load();
+
+    // Back discards a voltage draft like every other Settings draft.
+    AppManager::launch(new SettingsApp());
+    frame(wm, 3);
+    moveFocus(wm, 13);
+    send(wm, EVT_OK);
+    send(wm, EVT_RIGHT);
+    send(wm, EVT_OK);
+    send(wm, EVT_BACK);
+    frame(wm, 2);
+    checked(wm.getStackSize() == anchorPages, "Back exits an edited voltage draft");
+    ConfigManager::load();
+    checked(Crabit::Bw16Voltage::targetMv() == 3000,
+            "Back discards the voltage draft without saving");
+
+    // An owned/active BW16 blocks starting the edit; the ignored direction must
+    // not silently accumulate once the radio is off again.
+    g_coproc_active = true;
+    AppManager::launch(new SettingsApp());
+    frame(wm, 3);
+    moveFocus(wm, 13);
+    checked(dynamic_cast<RenderSettingsOptionPicker*>(focus(wm)) != nullptr,
+            "focus index 13 is the BW16 voltage picker");
+    send(wm, EVT_OK);
+    frame(wm, 1);
+    checked(toastIs("请先关闭BW16"), "an owned BW16 blocks starting a voltage edit");
+    send(wm, EVT_OK);     // Still blocked: not editing yet.
+    g_coproc_active = false;
+    send(wm, EVT_OK);     // Now enters editing.
+    send(wm, EVT_RIGHT);  // 3.0V -> 3.1V, one accepted direction only.
+    send(wm, EVT_OK);
+    moveFocus(wm, 1);  // voltage -> APPLY
+    unsigned voltage_save = settings_flat_flash_program_calls;
+    send(wm, EVT_OK);
+    frame(wm, 2);
+    checked(toastIs("已应用"), "voltage-only Apply saves through the existing path");
+    Crabit::Bw16Voltage::Record saved = storedVoltage();
+    checked(Crabit::Bw16Voltage::valid(saved) && saved.code == 1,
+            "blocked directions never changed the voltage draft");
+    checked(Crabit::Bw16Voltage::targetMv() == 3100, "Apply selects the 3.1V target in RAM");
+    checked(settings_flat_flash_program_calls == voltage_save + 8,
+            "voltage Apply writes six config words plus both trailers");
+    checked(std::memcmp(settings_flat_flash_image, &sys_cfg, sizeof(SystemConfig)) == 0,
+            "the voltage trailer leaves the 48-byte config image intact");
+
+    Crabit::Bw16Voltage::load(Crabit::Bw16Voltage::Record{});
+    ConfigManager::load();
+    checked(Crabit::Bw16Voltage::targetMv() == 3100, "the 3.1V target survives a boot load");
+
+    // 3.1V -> 3.2V on the still-open page.
+    movePrevious(wm, 1);  // APPLY -> voltage
+    send(wm, EVT_OK);
+    send(wm, EVT_RIGHT);
+    send(wm, EVT_OK);
+    moveFocus(wm, 1);
+    voltage_save = settings_flat_flash_program_calls;
+    send(wm, EVT_OK);
+    frame(wm, 2);
+    saved = storedVoltage();
+    checked(toastIs("已应用") && Crabit::Bw16Voltage::valid(saved) && saved.code == 2,
+            "3.2V target is stored in the local trailer");
+    checked(settings_flat_flash_program_calls == voltage_save + 8,
+            "a second voltage Apply writes one more complete record");
+    send(wm, EVT_BACK);
+    frame(wm, 2);
+    Crabit::Bw16Voltage::load(Crabit::Bw16Voltage::Record{});
+    ConfigManager::load();
+    checked(Crabit::Bw16Voltage::targetMv() == 3200, "the 3.2V target survives a boot load");
+
+    // A failed voltage doubleword must not be claimed as persisted and must
+    // fall back to 3.0V on the next load (the page is erased first).
+    AppManager::launch(new SettingsApp());
+    frame(wm, 3);
+    moveFocus(wm, 13);
+    send(wm, EVT_OK);
+    send(wm, EVT_LEFT);  // 3.2V -> 3.1V
+    send(wm, EVT_OK);
+    moveFocus(wm, 1);
+    voltage_save = settings_flat_flash_program_calls;
+    const unsigned voltage_lock = settings_flat_flash_lock_calls;
+    settings_flat_program_fail_call = voltage_save + 8;
+    send(wm, EVT_OK);
+    frame(wm, 2);
+    checked(toastIs("保存失败"), "failed voltage trailer reports the existing save failure");
+    checked(settings_flat_flash_program_calls == voltage_save + 8 &&
+                settings_flat_flash_lock_calls == voltage_lock + 1,
+            "failed voltage trailer still reaches the Flash lock path");
+    saved = storedVoltage();
+    checked(!Crabit::Bw16Voltage::valid(saved),
+            "erased voltage trailer is not a saved record");
+    checked(Crabit::Bw16Voltage::targetMv() == 3200,
+            "failed save restores the previous in-RAM target");
+    send(wm, EVT_BACK);
+    frame(wm, 2);
+    // The partial erase/program really lost the old trailer: next boot is 3.0V.
+    Crabit::Bw16Voltage::load(Crabit::Bw16Voltage::Record{});
+    ConfigManager::load();
+    checked(Crabit::Bw16Voltage::targetMv() == 3000,
+            "failed voltage trailer falls back to 3.0V on the next load");
+    settings_flat_program_fail_call = 0;
+    AppManager::launch(new SettingsApp());
+    frame(wm, 3);
+    moveFocus(wm, 13);
+    send(wm, EVT_OK);
+    send(wm, EVT_RIGHT);  // 3.0V -> 3.1V
+    send(wm, EVT_OK);
+    moveFocus(wm, 1);
+    voltage_save = settings_flat_flash_program_calls;
+    send(wm, EVT_OK);
+    frame(wm, 2);
+    checked(toastIs("已应用"), "voltage retry succeeds after the program failure");
+    checked(settings_flat_flash_program_calls == voltage_save + 8,
+            "retry persists a complete voltage record");
+    Crabit::Bw16Voltage::load(Crabit::Bw16Voltage::Record{});
+    ConfigManager::load();
+    checked(Crabit::Bw16Voltage::targetMv() == 3100, "retried 3.1V target loads back");
+    send(wm, EVT_BACK);
+    frame(wm, 2);
+
+    // A busy flash transaction leaves the previous target untouched.
+    AppManager::launch(new SettingsApp());
+    frame(wm, 3);
+    moveFocus(wm, 13);
+    send(wm, EVT_OK);
+    send(wm, EVT_RIGHT);  // 3.1V -> 3.2V
+    send(wm, EVT_OK);
+    moveFocus(wm, 1);
+    voltage_save = settings_flat_flash_program_calls;
+    settings_flat_flash_busy = 1;
+    send(wm, EVT_OK);
+    frame(wm, 2);
+    checked(toastIs("保存失败") && settings_flat_flash_program_calls == voltage_save,
+            "busy save leaves Flash untouched");
+    saved = storedVoltage();
+    checked(Crabit::Bw16Voltage::valid(saved) && saved.code == 1,
+            "busy save preserves the previously stored target");
+    checked(Crabit::Bw16Voltage::targetMv() == 3100,
+            "busy save restores the previous in-RAM target");
+    // Exiting without a retry must boot the unchanged 3.1V target.
+    send(wm, EVT_BACK);
+    frame(wm, 2);
+    Crabit::Bw16Voltage::load(Crabit::Bw16Voltage::Record{});
+    ConfigManager::load();
+    checked(Crabit::Bw16Voltage::targetMv() == 3100,
+            "exiting after a busy failure keeps the boot target unchanged");
+    settings_flat_flash_busy = 0;
+    AppManager::launch(new SettingsApp());
+    frame(wm, 3);
+    moveFocus(wm, 13);
+    send(wm, EVT_OK);
+    send(wm, EVT_RIGHT);  // 3.1V -> 3.2V
+    send(wm, EVT_OK);
+    moveFocus(wm, 1);
+    voltage_save = settings_flat_flash_program_calls;
+    send(wm, EVT_OK);
+    frame(wm, 2);
+    checked(toastIs("已应用") && settings_flat_flash_program_calls == voltage_save + 8,
+            "voltage retry saves once the flash transaction is available");
+    Crabit::Bw16Voltage::load(Crabit::Bw16Voltage::Record{});
+    ConfigManager::load();
+    checked(Crabit::Bw16Voltage::targetMv() == 3200, "retried 3.2V target loads back");
+    send(wm, EVT_BACK);
+    frame(wm, 2);
+
+    // A remote settings save (same ConfigManager::save path) must keep the
+    // already stored 3.2V target while persisting its own fields.
+    sys_cfg.screen_off_ms = 5500;
+    const auto remote_save = ConfigManager::save();
+    checked(remote_save == ConfigManager::SaveResult::Saved,
+            "remote-style save succeeds through the existing path");
+    Crabit::Bw16Voltage::load(Crabit::Bw16Voltage::Record{});
+    ConfigManager::load();
+    checked(Crabit::Bw16Voltage::targetMv() == 3200,
+            "an unrelated remote save keeps the stored 3.2V target");
+    checked(sys_cfg.screen_off_ms == 5500,
+            "the unrelated remote save still persists its own field");
+
+    // A BW16 that starts after editing blocks only the voltage; the other
+    // drafts still apply and the stored target is not overwritten.
+    AppManager::launch(new SettingsApp());
+    frame(wm, 3);
+    moveFocus(wm, 13);
+    send(wm, EVT_OK);
+    send(wm, EVT_LEFT);  // 3.2V -> 3.1V
+    send(wm, EVT_OK);
+    movePrevious(wm, 12);  // voltage -> invert
+    const bool invert_before = sys_cfg.invert_disp;
+    send(wm, EVT_OK);
+    g_coproc_active = true;
+    moveFocus(wm, 13);  // invert -> APPLY
+    voltage_save = settings_flat_flash_program_calls;
+    send(wm, EVT_OK);
+    frame(wm, 2);
+    checked(toastIs("已应用 电压未改"),
+            "a BW16 that started after editing blocks only the voltage");
+    checked(sys_cfg.invert_disp != invert_before,
+            "unrelated drafts still apply while the voltage is blocked");
+    checked(settings_flat_flash_program_calls == voltage_save + 8,
+            "blocked voltage still commits the other settings exactly once");
+    saved = storedVoltage();
+    checked(Crabit::Bw16Voltage::valid(saved) && saved.code == 2,
+            "blocked voltage leaves the stored target untouched");
+    checked(Crabit::Bw16Voltage::targetMv() == 3200,
+            "blocked voltage leaves the in-RAM target untouched");
+    g_coproc_active = false;
+    voltage_save = settings_flat_flash_program_calls;
+    send(wm, EVT_OK);
+    frame(wm, 2);
+    checked(toastIs("已应用") && settings_flat_flash_program_calls == voltage_save + 8,
+            "voltage-only retry succeeds once the BW16 is off");
+    Crabit::Bw16Voltage::load(Crabit::Bw16Voltage::Record{});
+    ConfigManager::load();
+    checked(Crabit::Bw16Voltage::targetMv() == 3100, "the retried 3.1V target loads back");
+    send(wm, EVT_BACK);
+    frame(wm, 2);
+
+    // DCDC3 enable alone (stale owner marker) blocks, and an unreadable PMU is
+    // rejected both while editing and at save time.
+    AppManager::launch(new SettingsApp());
+    frame(wm, 3);
+    moveFocus(wm, 13);
+    send(wm, EVT_OK);
+    send(wm, EVT_LEFT);  // 3.1V -> 3.0V
+    send(wm, EVT_OK);
+    movePrevious(wm, 12);  // voltage -> invert
+    send(wm, EVT_OK);
+    settings_flat_pmu_dc_onoff = 0x05;  // DCDC3 enabled, no session marker
+    moveFocus(wm, 13);
+    voltage_save = settings_flat_flash_program_calls;
+    send(wm, EVT_OK);
+    frame(wm, 2);
+    checked(toastIs("已应用 电压未改"), "enabled DCDC3 blocks the voltage at save time");
+    saved = storedVoltage();
+    checked(Crabit::Bw16Voltage::valid(saved) && saved.code == 1,
+            "the DCDC3 register check leaves the stored target untouched");
+    settings_flat_pmu_dc_onoff = 0x01;
+    movePrevious(wm, 13);  // APPLY -> invert
+    send(wm, EVT_OK);
+    moveFocus(wm, 13);
+    settings_flat_axp_read_status = HAL_ERROR;
+    voltage_save = settings_flat_flash_program_calls;
+    send(wm, EVT_OK);
+    frame(wm, 2);
+    checked(toastIs("已应用 电压未读"),
+            "an I2C failure blocks the voltage but keeps other drafts");
+    checked(settings_flat_flash_program_calls == voltage_save + 8,
+            "unreadable PMU still commits the other settings exactly once");
+    saved = storedVoltage();
+    checked(Crabit::Bw16Voltage::valid(saved) && saved.code == 1,
+            "unreadable PMU leaves the stored target untouched");
+    settings_flat_axp_read_status = HAL_OK;
+    voltage_save = settings_flat_flash_program_calls;
+    send(wm, EVT_OK);
+    frame(wm, 2);
+    checked(toastIs("已应用") && settings_flat_flash_program_calls == voltage_save + 8,
+            "voltage-only retry saves once the PMU is readable");
+    Crabit::Bw16Voltage::load(Crabit::Bw16Voltage::Record{});
+    ConfigManager::load();
+    checked(Crabit::Bw16Voltage::targetMv() == 3000, "the retried 3.0V target loads back");
+    send(wm, EVT_BACK);
+    frame(wm, 2);
+
+    // Each existing owner marker independently blocks a voltage edit; every
+    // state is reset before the next case so nothing leaks into later checks.
+    auto ownerBlocksVoltageEdit = [&](const char* message, auto arm, auto disarm) {
+        AppManager::launch(new SettingsApp());
+        frame(wm, 3);
+        moveFocus(wm, 13);
+        arm();
+        send(wm, EVT_OK);
+        frame(wm, 1);
+        checked(toastIs("请先关闭BW16"), message);
+        disarm();
+        send(wm, EVT_OK);     // Guard released: enters editing.
+        send(wm, EVT_RIGHT);  // Draft only; never persisted.
+        send(wm, EVT_OK);
+        send(wm, EVT_BACK);
+        frame(wm, 2);
+        checked(wm.getStackSize() == anchorPages, "owner-state edit returns to the anchor");
+        ConfigManager::load();
+        checked(Crabit::Bw16Voltage::targetMv() == 3000,
+                "owner-state voltage draft never persists");
+    };
+    ownerBlocksVoltageEdit(
+        "CompanionBle active blocks a voltage edit",
+        [] { Crabit::CompanionBle::fake_active = true; },
+        [] { Crabit::CompanionBle::fake_active = false; });
+    ownerBlocksVoltageEdit(
+        "CompanionBle transitioning blocks a voltage edit",
+        [] { Crabit::CompanionBle::fake_transitioning = true; },
+        [] { Crabit::CompanionBle::fake_transitioning = false; });
+    ownerBlocksVoltageEdit(
+        "AMEBA transition blocks a voltage edit",
+        [] { Crabit::setAmebaPhase(Crabit::AmebaPhase::Transition); },
+        [] { Crabit::setAmebaPhase(Crabit::AmebaPhase::Inactive); });
+    ownerBlocksVoltageEdit(
+        "AMEBA running blocks a voltage edit",
+        [] { Crabit::setAmebaPhase(Crabit::AmebaPhase::Running); },
+        [] { Crabit::setAmebaPhase(Crabit::AmebaPhase::Inactive); });
+
+    // Unreadable PMU also refuses to start an edit.
+    settings_flat_axp_read_status = HAL_ERROR;
+    AppManager::launch(new SettingsApp());
+    frame(wm, 3);
+    moveFocus(wm, 13);
+    send(wm, EVT_OK);
+    frame(wm, 1);
+    checked(toastIs("电源状态未知"), "unreadable PMU blocks starting a voltage edit");
+    settings_flat_axp_read_status = HAL_OK;
+    send(wm, EVT_BACK);
+    frame(wm, 2);
+    checked(wm.getStackSize() == anchorPages, "voltage tests return to the anchor page");
+    Crabit::Bw16Voltage::load(Crabit::Bw16Voltage::Record{});
+    ConfigManager::load();
+    checked(Crabit::Bw16Voltage::targetMv() == 3000,
+            "blocked edits never changed the stored target");
+    frame(wm, 100);  // expire the last toast before the allocation loop
+
     const size_t anchorLive = heap.live;
     for (unsigned cycle = 0; cycle < 30; ++cycle) {
         AppManager::launch(new SettingsApp());

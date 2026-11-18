@@ -84,16 +84,16 @@ def extracted_renderer(beacon: str) -> str:
 class BeaconReadableUiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.beacon = (BW / "app/app_wifi_beacon.h").read_text(encoding="utf-8")
+        cls.beacon = (BW / "app/apps/wireless/app_wifi_beacon.h").read_text(encoding="utf-8")
 
     def test_old_ghost_removed_and_bluetooth_center_preserved(self):
-        tools = (BW / "app/app_wifi_tools.h").read_text(encoding="utf-8")
-        self.assertFalse((BW / "app/app_ble_ghost.h").exists())
+        tools = (BW / "app/apps/wireless/app_wifi_tools.h").read_text(encoding="utf-8")
+        self.assertFalse((BW / "app/apps/wireless/app_ble_ghost.h").exists())
         self.assertNotIn("AppBleGhost", tools)
         self.assertNotIn("app_ble_ghost.h", tools)
-        launcher = (BW / "app/launcher.h").read_text(encoding="utf-8")
+        launcher = (BW / "app/core/launcher.h").read_text(encoding="utf-8")
         self.assertIn("AppBleSpam", launcher)
-        self.assertTrue((BW / "app/app_ble_spam.h").is_file())
+        self.assertTrue((BW / "app/apps/wireless/app_ble_spam.h").is_file())
 
     def test_static_chinese_canvas_labels_have_product_8px_glyphs(self):
         source = self.beacon

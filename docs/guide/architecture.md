@@ -46,7 +46,7 @@ App 状态、控件树和 RenderObject 的寿命需要协调，但不应由应�
 | --- | --- | --- |
 | STM32 `Core/NanoUI/app_real/` | 默认嵌入式产品 App；由当前 CMake 接入 | 产品维护入口 |
 | STM32 `Core/NanoUI/app_desktop/` | 原桌面模拟器及布局观察工具 | 不是无用备份，保留独立资源配置 |
-| BW16 `NanoUI/app/` | 当前 Arduino 产品 App | 产品维护入口 |
+| BW16 `NanoUI/app/` | 当前 Arduino 产品 App；游戏位于 `app/apps/games/` | 产品维护入口，目录约定见 [app/README.md](../../firmware/rtl8720dn/NanoUI/app/README.md) |
 | BW16 `NanoUI/app_example/` | 示例资源配置和工具可选扫描范围 | 不混入默认产品字库；保留示例用途 |
 | `libraries/NanoUI/examples/` | 独立框架接入示例 | 不依赖 Crabit 的硬件 App |
 
@@ -79,4 +79,5 @@ BW16 保留 BLE owner 和无线协调代码，不能因此推断所有旧 App �
 - [BW16 工程说明](../../firmware/rtl8720dn/README.md)
 - [NanoUI 独立库](../../libraries/NanoUI/README.md)
 - [Flutter 工程](../../apps/mobile/README.md)
+- 总体架构与迁移路线图
 - [当前状态和历史证据](status.md)

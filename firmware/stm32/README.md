@@ -17,9 +17,23 @@ cmake --preset MinSizeRel
 cmake --build --preset MinSizeRel
 ```
 
+## 产品目录迁移
+
+`Core` 保留 CubeMX/HAL/启动与未迁文件。D0 已完成 `product/board/`、
+`product/features/companion/`；D1 的 `link_queue`、`settings_service`、
+`diagnostic_service` 文件对已进入 `product/services/{link,settings,diagnostics}/`，
+`audit_service` 进入 `product/features/audit/`；D2 将 `network_weather` 移入
+`product/features/network/`，`companion_trace` 移入 `product/services/diagnostics/`。
+D1 迁移与主 AI 集成验证通过，独立审查无阻塞项，本地提交 `3374fe6`：84 项针对性测试及 STM32 MinSizeRel 构建通过，ELF/BIN 与 D0 字节相同。
+D2 已验收：102 项针对性测试、STM32 构建通过，ELF/BIN 与 D1 字节相同，独立审查无阻塞项。旧 weather/trace 夹具仍缺依赖或测试桩，不在通过集合内；未重跑预览、未操作硬件。
+LinkQueue 是通信队列；Audit 是 BW16 无线审计 App 的记录中转 feature，
+不是通用系统审计框架。设置、诊断和 Audit 共用既有链路，不另起 UART；
+诊断中的 USB script 混杂留待后续拆分，本轮不统一 topic 注册机制。
+批次与验证边界见架构地图。
+
 ## Runtime boundaries
 
-- Standalone `BLE LINK` is owned by `companion_ble.cpp` on the UI task, not by
+- Standalone `BLE LINK` is owned by `product/features/companion/companion_ble.cpp` on the UI task, not by
   the page. STM32 keeps OLED; clock UP+DOWN for 1 s toggles the session. This
   hardware candidate holds STM32 awake and suppresses sensor bus recovery while
   BW16 is owned. Existing legacy autostart is explicitly tracked, never silently

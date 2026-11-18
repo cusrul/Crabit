@@ -1,5 +1,6 @@
 """Host contracts for BW16 compile/size profiles; no SDK or image build."""
 
+import json
 import re
 import shutil
 import subprocess
@@ -10,6 +11,7 @@ import uuid
 from pathlib import Path
 
 from tools.tests import test_nanoui_original_extraction as extraction
+from tools.tests.history_revisions import require_history
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -109,6 +111,7 @@ class Bw16ProfileContracts(unittest.TestCase):
                 self.assertIn("Unsupported CRABIT_BW16_PROFILE", result.stderr)
 
     def test_fixed_922_firmware_scope_is_profiles_and_desktop_shutdown_only(self):
+        require_history(ROOT, extraction.BW16_PROFILE_BASE, PROFILE_SNAPSHOT)
         tracked = subprocess.check_output(
             [
                 "git",
@@ -232,7 +235,18 @@ class Bw16ProfileContracts(unittest.TestCase):
         (root / "firmware/shared").mkdir(parents=True)
         (root / "libraries/NanoUI").mkdir(parents=True)
         shutil.copy2(WRAPPER, tools / "build-rtl8720dn.ps1")
+        shutil.copy2(ROOT / "tools/bw16_shared_headers.json", tools / "bw16_shared_headers.json")
+        staged_shared = firmware / "crabit_shared"
+        staged_shared.mkdir()
+        for header in json.loads((ROOT / "tools/bw16_shared_headers.json").read_text(encoding="utf-8"))["headers"]:
+            shutil.copy2(ROOT / "firmware/shared" / header, root / "firmware/shared" / header)
+            (staged_shared / header).write_text("// staged copy\n", encoding="ascii")
         (firmware / "NanoUI_Preflight.h").write_text("// test fixture\n", encoding="ascii")
+        # The production wrapper refuses to build without a local BLE code; a clean
+        # clone has no private header, so the fixture writes its own placeholder.
+        (firmware.parent / "ble_auth.local.h").write_text(
+            '#pragma once\n#define CRABIT_BLE_AUTH_CODE "000000"\n', encoding="ascii"
+        )
         (tools / "check-bw16-image.ps1").write_text(
             "[IO.File]::WriteAllText($env:BW16_GUARD_LOG, ($args -join '|'))\n"
             "exit [int]$env:BW16_GUARD_EXIT\n",

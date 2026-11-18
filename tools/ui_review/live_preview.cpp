@@ -467,8 +467,9 @@ int HAL_RTC_GetDate(int*, RTC_DateTypeDef* value, int) {
 extern "C" void OLED_WR_Byte(uint8_t, uint8_t) {
 }
 GlobalDataStore GlobalStore;
-extern "C" void BW16_Dedicated_Bridge() {
+extern "C" bool BW16_Dedicated_Bridge() {
     ++bridgeCalls;
+    return true;
 }
 int HAL_RTC_SetTime(int*, RTC_TimeTypeDef* value, int) {
     writtenTime = *value;

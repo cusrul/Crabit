@@ -70,16 +70,16 @@ namespace Protocol {
         return true;
     }
 
-    void send_to_stm32(const char* payload) {
-        char topic[CrabitWire::MAX_TOPIC + 1];
-        char value[CrabitWire::MAX_VALUE + 1];
-        uint16_t request_id = 0;
+    bool decode_command_json(const char* payload, char* topic, size_t topic_capacity,
+                             char* value, size_t value_capacity, uint16_t* request_id) {
+        if (!payload || !topic || !value || !request_id) return false;
         unsigned long parsed_request_id = 0;
-        if (json_number_field(payload, "i", &parsed_request_id)) {
-            request_id = (uint16_t)parsed_request_id;
-        }
-        if (json_field(payload, "t", topic, sizeof(topic)) &&
-            json_field(payload, "v", value, sizeof(value))) send_message(topic, value, request_id);
+        if (json_number_field(payload, "i", &parsed_request_id))
+            *request_id = (uint16_t)parsed_request_id;
+        else
+            *request_id = 0;
+        return json_field(payload, "t", topic, topic_capacity) &&
+               json_field(payload, "v", value, value_capacity);
     }
 
     void store_background_msg(String topic, String payload) {

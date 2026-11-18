@@ -24,6 +24,7 @@
 /* USER CODE BEGIN INCLUDE */
 
 #include "usart.h"  // ?? ????????? huart1
+#include "uart_owner.h"
 #include "usb_composite_config.h"
 #include "usb_diag.h"
 #include <string.h>
@@ -101,8 +102,6 @@ uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 /* USER CODE BEGIN PRIVATE_VARIABLES */
 
 extern UART_HandleTypeDef huart1;
-extern volatile uint8_t bw16_flash_mode;
-extern uint8_t uart_rx_ring_buf[]; // ????? UART ?????
 
 // ?? ?????????????? USB ???
 volatile uint8_t usb_rx_ready = 0;
@@ -238,28 +237,12 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
     {
         /* USER CODE BEGIN SET_LINE_CODING */
         if (pbuf == NULL || length < 7U) return (USBD_FAIL);
-        // 1. ???????????
         uint32_t baudrate = (uint32_t)(pbuf[0] | (pbuf[1] << 8) | (pbuf[2] << 16) | (pbuf[3] << 24));
-        
-        /* Host serial-open probes must not reconfigure the normal UI UART. */
-        if (bw16_flash_mode && baudrate != 0 && huart1.Init.BaudRate != baudrate) {
-            HAL_UART_DeInit(&huart1);
-            huart1.Init.BaudRate = baudrate;
-            HAL_UART_Init(&huart1);
-            
-            // 2. ?????????????????? DMA???? Init ??? NORMAL ??
-            if (bw16_flash_mode) {
-                extern volatile uint16_t ring_last_head;
-                extern DMA_HandleTypeDef hdma_usart1_rx;
-                
-                // ?? ?????????????????
-                hdma_usart1_rx.Init.Mode = DMA_CIRCULAR; 
-                HAL_DMA_Init(&hdma_usart1_rx);
 
-                ring_last_head = 0; 
-                HAL_UART_Receive_DMA(&huart1, uart_rx_ring_buf, 2048); 
-            }
-        }
+        /* This runs in USB interrupt context. Never touch huart1/DMA here:
+         * only record the host value; an exclusive bridge owner applies it
+         * between transfers. Normal UI UART opens remain inert. */
+        (void)UartOwner_RequestLineCoding(baudrate);
         /* USER CODE END SET_LINE_CODING */
     }
 
@@ -267,10 +250,13 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 
     case CDC_GET_LINE_CODING:
       if (pbuf == NULL || length < 7U) return (USBD_FAIL);
-      pbuf[0] = (uint8_t)(huart1.Init.BaudRate & 0xFFU);
-      pbuf[1] = (uint8_t)((huart1.Init.BaudRate >> 8) & 0xFFU);
-      pbuf[2] = (uint8_t)((huart1.Init.BaudRate >> 16) & 0xFFU);
-      pbuf[3] = (uint8_t)((huart1.Init.BaudRate >> 24) & 0xFFU);
+      {
+        const uint32_t baudrate = UartOwner_LineCodingBaud();
+        pbuf[0] = (uint8_t)(baudrate & 0xFFU);
+        pbuf[1] = (uint8_t)((baudrate >> 8) & 0xFFU);
+        pbuf[2] = (uint8_t)((baudrate >> 16) & 0xFFU);
+        pbuf[3] = (uint8_t)((baudrate >> 24) & 0xFFU);
+      }
       pbuf[4] = 0U; /* one stop bit */
       pbuf[5] = 0U; /* no parity */
       pbuf[6] = 8U; /* eight data bits */
@@ -311,13 +297,14 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
-  if(bw16_flash_mode) {
-      // 1. ??????????????? ready ???? UART ??
+  if (UartOwner_Active() == UART_OWNER_FLASH) {
+      // Hold one packet for the exclusive bridge. It is not re-armed here, so
+      // the owner can apply a pending line coding before forwarding it.
       usb_rx_len = *Len;
       usb_rx_ready = 1;
-      
-      // ?? ??????????? USBD_CDC_ReceivePacket()?
-      // ?????????????? NAK??????????????????
+
+      // Do not re-arm USBD_CDC_ReceivePacket(): the endpoint NAKs until the
+      // bridge has finished this packet.
       return (USBD_OK); 
   }
 
@@ -341,7 +328,7 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   * @param  Len: Number of data to be sent (in bytes)
   * @retval USBD_OK if all operations are OK else USBD_FAIL or USBD_BUSY
   */
-uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
+static uint8_t CDC_TransmitOwned(const uint8_t* Buf, uint16_t Len, bool bridge)
 {
   uint8_t result = USBD_OK;
   uint32_t primask;
@@ -352,6 +339,11 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
   }
   primask = __get_PRIMASK();
   __disable_irq();
+  // Check the owner in the same critical section that starts the IN transfer.
+  if ((UartOwner_Active() == UART_OWNER_FLASH) != bridge) {
+    __set_PRIMASK(primask);
+    return USBD_FAIL;
+  }
   savedClassId = hUsbDeviceFS.classId;
   hUsbDeviceFS.classId = CRABIT_USB_CDC_CLASS;
   USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassDataCmsit[CRABIT_USB_CDC_CLASS];
@@ -372,6 +364,16 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
   __set_PRIMASK(primask);
   /* USER CODE END 7 */
   return result;
+}
+
+uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
+{
+  return CDC_TransmitOwned(Buf, Len, false);
+}
+
+uint8_t CDC_TransmitBridge_FS(const uint8_t* Buf, uint16_t Len)
+{
+  return CDC_TransmitOwned(Buf, Len, true);
 }
 
 /**

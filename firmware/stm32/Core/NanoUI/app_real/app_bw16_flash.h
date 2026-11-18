@@ -2,6 +2,8 @@
 #define APP_BW16_FLASH_H
 
 #include "NanoUI/NanoUI.h"
+#include "topics.h"
+#include "comms_link.h"
 #include "event_bus.h" 
 #include "global_store.h" 
 #include <string.h>
@@ -12,7 +14,7 @@
 #define SYS_USB_MODE 0
 #endif
 
-extern "C" void BW16_Dedicated_Bridge();
+extern "C" bool BW16_Dedicated_Bridge();
 
 // ==================================================
 // 馃専 闈欐€佸叏灞€鍙橀噺锛氬畬缇庨伩寮€ Lambda 鐨?[this] 鎹曡幏闄愬埗
@@ -35,7 +37,7 @@ public:
 
     void onDestroy() override {
         if (g_ota_started) {
-            EventBus::publish("sys/mode", "REBOOT");
+            CrabitLink::send(Topics::SysMode, "REBOOT");
             g_ota_started = false; // 娓呴櫎鏍囪
         }
     }
@@ -61,7 +63,7 @@ public:
         children.push_back(new Text("USB 串口桥接 1.5M", 8));
         children.push_back(new SizedBox(0, 6));
         children.push_back(new Button(new DecoratedBox(new Padding(new Text("开始烧录", 8), Insets::all(3)), false, 2), [](){
-            BW16_Dedicated_Bridge(); 
+            if (!BW16_Dedicated_Bridge()) Popup::showToast("BRIDGE FAIL");
         }));
 #else
         // 馃専 涓嶅甫鎹曡幏 [] 鐨勭函鍑€ Lambda锛屽畬缇庨€傞厤 Button 鐨勫洖璋冿紒
@@ -76,7 +78,7 @@ public:
             HAL_Delay(2000); // 缁欏畠 1.5 绉掕嫃閱?
             
             // 2. 鍙戝竷 OTA 妯″紡鎸囦护
-            EventBus::publish("sys/mode", "OTA");
+            CrabitLink::send(Topics::SysMode, "OTA");
             g_ota_started = true;
             strcpy(g_ota_status_msg, "Sending CMD...");
             if (WindowManager::instance) WindowManager::instance->markDirty();

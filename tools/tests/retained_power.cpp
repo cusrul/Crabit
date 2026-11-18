@@ -17,18 +17,18 @@ static bool test_deep_retains_page_and_supply() {
     CHECK(screen_power_fake::count("oled_init") == 0);
     CHECK(screen_power_fake::count("input_reset") == 1);
     CHECK(wm.stack_size == 3);
-    CHECK(WakeMetrics::stop_reason.load() == uint32_t(McuStop2::Reason::Qmi));
+    CHECK(WakeMetrics::stop_reason.load() == uint32_t(Stop2::Reason::Qmi));
     return true;
 }
 static bool test_busy_usb_keeps_screen_only() {
     begin(3000, 100, 100);
-    McuStop2::blocked_reason = McuStop2::Reason::Usb;
+    screen_power_fake::blocked_reason = Stop2::Reason::Usb;
     screen_power_fake::now_ms = 3100;
     SysPower::tick();
     CHECK(!SysPower::isActive());
     CHECK(screen_power_fake::count("stop2") == 0);
-    CHECK(WakeMetrics::stop_reason.load() == uint32_t(McuStop2::Reason::Usb));
-    McuStop2::blocked_reason = McuStop2::Reason::None;
+    CHECK(WakeMetrics::stop_reason.load() == uint32_t(Stop2::Reason::Usb));
+    screen_power_fake::blocked_reason = Stop2::Reason::None;
     return true;
 }
 static bool test_disabled_deep_never_enters_stop2() {
@@ -45,7 +45,7 @@ static bool test_other_records_core_snapshots() {
     WakeCoreTrace::valid = true;
     WakeCoreTrace::before.icsr = 0x04000000u;
     WakeCoreTrace::after.pending[0] = 0x02000000u;
-    McuStop2::next_result = {McuStop2::Reason::Other, true, 0, 80000000};
+    screen_power_fake::next_result = {Stop2::Reason::Other, true, 0, 80000000};
     const auto previous = WakeHistory::nextSequence;
     screen_power_fake::now_ms = 70100;
     SysPower::tick();
@@ -58,7 +58,7 @@ static bool test_other_records_core_snapshots() {
 int main() {
     // Motion during entry must not start another full screen-on interval.
     begin(10000, 100, 100);
-    McuStop2::next_result = {McuStop2::Reason::MotionPending, false, 0, 80000000};
+    screen_power_fake::next_result = {Stop2::Reason::MotionPending, false, 0, 80000000};
     screen_power_fake::now_ms = 10100;
     SysPower::tick();
     if (SysPower::isActive() || screen_power_fake::count("stop2") != 1 ||
@@ -67,7 +67,7 @@ int main() {
     screen_power_fake::now_ms = 10500;
     SysPower::tick();
     if (SysPower::isActive() || screen_power_fake::count("stop2") != 1) return EXIT_FAILURE;
-    McuStop2::next_result = {McuStop2::Reason::Qmi, true, 1, 80000000};
+    screen_power_fake::next_result = {Stop2::Reason::Qmi, true, 1, 80000000};
     screen_power_fake::now_ms = 11100;
     SysPower::tick();
     if (!SysPower::isActive() || screen_power_fake::count("stop2") != 2) return EXIT_FAILURE;

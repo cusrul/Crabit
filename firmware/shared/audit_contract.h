@@ -3,15 +3,16 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "topics.h"
 
 // Small wire contract mirrored for Arduino IDE's isolated sketch build.
 namespace CrabitAudit {
 constexpr size_t MaxRecord = 768;
 constexpr size_t ChunkBytes = 64;
 constexpr size_t Capacity = 2;
-constexpr const char* PutTopic = "audit/put";
-constexpr const char* ReadTopic = "audit/read";
-constexpr const char* AckTopic = "audit/ack";
+inline constexpr const char* PutTopic = Topics::AuditPut;
+inline constexpr const char* ReadTopic = Topics::AuditRead;
+inline constexpr const char* AckTopic = Topics::AuditAck;
 
 inline bool number(const char*& p, uint32_t& result, char delimiter) {
     result = 0;

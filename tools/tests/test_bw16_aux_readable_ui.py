@@ -9,6 +9,7 @@ import unittest
 from PIL import Image
 from tools import render_bw16_small_fonts as base
 from tools.tests.test_bw16_product_fonts import glyphs
+from tools.tests.history_revisions import require_history
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "firmware/rtl8720dn/NanoUI/app"
@@ -70,10 +71,10 @@ def segment(source, start, end):
 
 
 def driver():
-    spam = (APP / "app_ble_spam.h").read_text(encoding="utf-8")
-    sync = (APP / "app_ble_sync.h").read_text(encoding="utf-8")
-    hopper = (APP / "app_hopper.h").read_text(encoding="utf-8")
-    tools = (APP / "app_wifi_tools.h").read_text(encoding="utf-8")
+    spam = (APP / "apps/wireless/app_ble_spam.h").read_text(encoding="utf-8")
+    sync = (APP / "apps/wireless/app_ble_sync.h").read_text(encoding="utf-8")
+    hopper = (APP / "apps/games/hopper/app.h").read_text(encoding="utf-8")
+    tools = (APP / "apps/wireless/app_wifi_tools.h").read_text(encoding="utf-8")
     spam_paint = segment(
         spam[spam.index("while (is_display_active)") :], "canvas->clear();", "canvas->display();"
     )
@@ -106,6 +107,9 @@ def driver():
         + "\nWidget* menu()"
         + menu[menu.index("{") :]
         + r"""
+enum class Mode : uint8_t { All, Count };
+Mode mode = Mode::All;
+const auto modeLabel = [](Mode) -> const char* { return "MODE"; };
 void spam(Canvas* canvas,bool busy) { """
         + spam_paint
         + r""" }
@@ -144,7 +148,12 @@ class AuxUiTests(unittest.TestCase):
         records = glyphs(
             (ROOT / "firmware/rtl8720dn/NanoUI/src/nanoui_assets.cpp").read_text(encoding="utf-8")
         )
-        for name in ("app_ble_spam.h", "app_ble_sync.h", "app_hopper.h", "app_wifi_tools.h"):
+        for name in (
+            "apps/wireless/app_ble_spam.h",
+            "apps/wireless/app_ble_sync.h",
+            "apps/games/hopper/app.h",
+            "apps/wireless/app_wifi_tools.h",
+        ):
             source = (APP / name).read_text(encoding="utf-8")
             # App IDs are not text painted by these pages (the tools folder is
             # labelled 网络审计 by its caller, not its getAppName metadata).
@@ -161,17 +170,22 @@ class AuxUiTests(unittest.TestCase):
                 )
 
     def test_aux_non_render_sources_match_preview_baseline(self):
-        for name in ("app_ble_spam.h", "app_hopper.h"):
+        require_history(ROOT, "162afaa")
+        for name, current_name in (
+            ("app_ble_spam.h", "apps/wireless/app_ble_spam.h"),
+            ("app_hopper.h", "apps/games/hopper/app.h"),
+        ):
             original = subprocess.check_output(
-                ["git", "show", f"3cc6569:firmware/rtl8720dn/NanoUI/app/{name}"], cwd=ROOT
+                ["git", "show", f"162afaa:firmware/rtl8720dn/NanoUI/app/{name}"], cwd=ROOT
             ).decode("utf-8")
-            current = (APP / name).read_text(encoding="utf-8")
+            current = (APP / current_name).read_text(encoding="utf-8")
 
             def normalized(source):
                 return "\n".join(
                     line.strip()
                     for line in source.splitlines()
                     if line.strip() and "canvas->" not in line
+                    and not line.strip().startswith("#include")
                 )
 
             self.assertEqual(normalized(original), normalized(current), name)

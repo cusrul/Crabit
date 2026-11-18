@@ -59,17 +59,28 @@ void HAL_GPIO_Init(GPIO_TypeDef*, GPIO_InitTypeDef*);
 void HAL_Delay(uint32_t);
 uint32_t HAL_GetTick();
 
-#include "qmi_run_profile.h"
-#include "sensor_stop2.h"
+#include "qmi_run.h"
+#include "power_policy.h"
 
-namespace I2cDiag {
-enum Device : uint32_t { Qmi };
-inline std::atomic<bool> paused{false};
-class Sample {
-   public:
-    Sample(Device, uint32_t) {}
+class I2cFault {
+public:
+    enum Device : uint32_t { Qmi };
+    static inline std::atomic<bool> paused{false};
+    class Sample {
+       public:
+        Sample(Device, uint32_t) {}
+    };
 };
-}  // namespace I2cDiag
+
+class I2cBus {
+public:
+    static bool read(uint8_t a, uint8_t r, uint8_t* v, size_t n, uint32_t t) {
+        return HAL_I2C_Mem_Read(&hi2c1, a, r, 1, v, (uint16_t)n, t) == HAL_OK;
+    }
+    static bool write(uint8_t a, uint8_t r, const uint8_t* v, size_t n, uint32_t t) {
+        return HAL_I2C_Mem_Write(&hi2c1, a, r, 1, const_cast<uint8_t*>(v), (uint16_t)n, t) == HAL_OK;
+    }
+};
 
 #include "qmi8658_tap_staged.hpp"
 
@@ -137,7 +148,7 @@ void reset() {
     ctrl9_mode = Ctrl9Mode::Complete;
     ctrl9_started = false;
     ctrl9_clear_phase = false;
-    I2cDiag::paused.store(false, std::memory_order_relaxed);
+    I2cFault::paused.store(false, std::memory_order_relaxed);
     SensorStop2::restoreFault.store(false, std::memory_order_relaxed);
     g_qmi_int1_cnt = 0;
     g_qmi_int2_cnt = 0;

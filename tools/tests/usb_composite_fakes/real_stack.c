@@ -9,6 +9,7 @@
 #include "usbd_composite_builder.h"
 #include "usbd_cdc_if.h"
 #include "usart.h"
+#include "uart_owner.h"
 
 #define CHECK(x) do { if (!(x)) { fprintf(stderr,"%s:%d: %s\n",__FILE__,__LINE__,#x); exit(1); } } while(0)
 USBD_HandleTypeDef hUsbDeviceFS;
@@ -20,6 +21,24 @@ UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_rx;
 volatile uint16_t ring_last_head;
 uint8_t uart_rx_ring_buf[2048];
+
+/* Production UART owner is exercised by its own STM32 guard tests; this
+ * fixture observes only whether the CDC interface respects the gate. */
+static UartOwnerMode owner_mode = UART_OWNER_NORMAL;
+static uint32_t requested_baud;
+UartOwnerMode UartOwner_Active(void) { return owner_mode; }
+bool UartOwner_RequestLineCoding(uint32_t baudrate) {
+  if (baudrate == 0) return false;
+  requested_baud = baudrate;
+  return true;
+}
+uint32_t UartOwner_LineCodingBaud(void) {
+  return owner_mode == UART_OWNER_FLASH ? requested_baud : huart1.Init.BaudRate;
+}
+static void flash_mode(int enabled) {
+  owner_mode = enabled ? UART_OWNER_FLASH : UART_OWNER_NORMAL;
+  bw16_flash_mode = enabled ? 1 : 0;
+}
 extern volatile uint8_t usb_rx_ready;
 extern volatile uint32_t usb_rx_len;
 extern uint8_t UserTxBufferFS[];
@@ -205,16 +224,47 @@ static void led_out(void) {
 }
 static void flash_rx(void) {
   unsigned before=out[1].arms;
-  bw16_flash_mode=1;
+  flash_mode(1);
   const char *type="CRABIT:USB:TYPE 12345678\n";
   host_out(1,(const uint8_t *)type,strlen(type));
   CHECK(usb_rx_ready==1 && usb_rx_len==strlen(type));
   CHECK(out[1].arms==before && out[1].pointer==NULL);
   CrabitUsb_DiagTick(); sof(1100); CHECK(in[3].sends==0 && in[1].sends==0);
   hUsbDeviceFS.classId=1; CDC_Resume_Receive(); CHECK(out[1].arms==before+1);
-  CHECK(hUsbDeviceFS.classId==1); bw16_flash_mode=0;
+  CHECK(hUsbDeviceFS.classId==1); flash_mode(0);
   command("CRABIT:USB:ECHO 11223344\n"); CHECK(out[1].arms==before+2);
   CHECK(in[1].sends==1 && in[3].sends==0);
+}
+static void line_coding_gate(void) {
+  unsigned calls=hal_uart_calls;
+  huart1.Init.BaudRate=460800;
+  /* 921600 = 0x000E1000, little-endian line coding payload. */
+  uint8_t coding[7]={0x00,0x10,0x0E,0x00,0,0,8};
+  flash_mode(1);
+  setup_packet(0x21,CDC_SET_LINE_CODING,0,0,7);
+  host_out(0,coding,7);
+  CHECK(hal_uart_calls==calls);       /* USB ISR only records the request. */
+  CHECK(requested_baud==921600);
+  CHECK(huart1.Init.BaudRate==460800); /* Active UART is not mutated. */
+  setup_packet(0xA1,CDC_GET_LINE_CODING,0,0,7);
+  CHECK(in[0].size==7);
+  CHECK(in[0].snapshot[0]==0x00 && in[0].snapshot[1]==0x10 &&
+        in[0].snapshot[2]==0x0E && in[0].snapshot[3]==0x00);
+  complete(0);
+  uint8_t sample[]={0x13,0x37};
+  unsigned sends=in[1].sends;
+  CHECK(CDC_Transmit_FS(sample,sizeof(sample))==USBD_FAIL);
+  CHECK(in[1].sends==sends);
+  CHECK(CDC_TransmitBridge_FS(sample,sizeof(sample))==USBD_OK);
+  CHECK(in[1].sends==sends+1);
+  complete(1);
+  flash_mode(0);
+  CHECK(CDC_TransmitBridge_FS(sample,sizeof(sample))==USBD_FAIL);
+  /* Normal UI UART opens still report/retain the real product baud. */
+  setup_packet(0xA1,CDC_GET_LINE_CODING,0,0,7);
+  CHECK(in[0].snapshot[0]==0x00 && in[0].snapshot[1]==0x08 &&
+        in[0].snapshot[2]==0x07 && in[0].snapshot[3]==0x00);
+  complete(0);
 }
 static void reset_cycles(void) {
   void *cdc=hUsbDeviceFS.pClassDataCmsit[0], *hid=hUsbDeviceFS.pClassDataCmsit[1];
@@ -246,7 +296,7 @@ static void allocation_failure(void) {
 static void flash_queue_sof(void) {
   const char *s="CRABIT:USB:TYPE 12345678\nCRABIT:USB:TYPE 89ab";
   host_out(1,(const uint8_t *)s,strlen(s));
-  bw16_flash_mode=1; sof(1100); bw16_flash_mode=0;
+  flash_mode(1); sof(1100); flash_mode(0);
   host_out(1,(const uint8_t *)"cdef\n",5); CrabitUsb_DiagTick();
   CHECK(CrabitUsb_KeyboardStatus()==CRABIT_KEYBOARD_IDLE && in[1].sends==0 && in[3].sends==0);
   command("CRABIT:USB:ECHO 12345678\n"); CHECK(in[1].sends==1);
@@ -254,7 +304,7 @@ static void flash_queue_sof(void) {
   s="CRABIT:USB:TYPE 12345678\nCRABIT:USB:TYPE 1122";
   host_out(1,(const uint8_t *)s,strlen(s));
   /* No normal SOF since the first flash exit: repeated boundaries still cancel. */
-  bw16_flash_mode=1; sof(1200); bw16_flash_mode=0; complete(1);
+  flash_mode(1); sof(1200); flash_mode(0); complete(1);
   host_out(1,(const uint8_t *)"3344\n",5);
   for(unsigned i=0;i<6;++i) CrabitUsb_DiagTick();
   CHECK(in[1].sends==1 && in[3].sends==0 && CrabitUsb_KeyboardStatus()==CRABIT_KEYBOARD_IDLE);
@@ -302,6 +352,7 @@ int main(int argc,char **argv) {
   else if(!strcmp(argv[1],"keyboard_completion")) keyboard_completion();
   else if(!strcmp(argv[1],"led_out")) led_out();
   else if(!strcmp(argv[1],"flash_rx")) flash_rx();
+  else if(!strcmp(argv[1],"line_coding_gate")) line_coding_gate();
   else if(!strcmp(argv[1],"reset_cycles")) reset_cycles();
   else if(!strcmp(argv[1],"allocation_failure")) allocation_failure();
   else if(!strcmp(argv[1],"flash_queue_sof")) flash_queue_sof();

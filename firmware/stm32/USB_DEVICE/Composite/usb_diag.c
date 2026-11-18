@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-extern uint16_t CrabitWakeHistory_Read(char *out, uint16_t capacity, uint32_t index);
 
 extern volatile uint8_t bw16_flash_mode;
 enum { LINE_SIZE = 64, QUEUE_SIZE = 4 };

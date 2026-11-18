@@ -3,22 +3,29 @@
 
 #include "NanoUI/NanoUI.h"
 
-// 寮曠敤搴曞眰鐨?C 鍑芥暟
-extern "C" void BW16_Release_Bus();
-extern "C" void BW16_Restore_Bus();
+// 独占闸门：进入前先取得 USART1/CDC 所有权，退出时恢复普通 DMA RX。
+extern "C" bool BW16_Enter_Bypass();
+extern "C" bool BW16_Exit_Bypass();
 
 class BusReleaseApp : public Application {
+    bool entered_ = false;
+    bool gate_failed_ = false;
+
 public:
     const char* getAppName() override { return "UART_BYPASS"; }
 
-    // 鏋勯€犲嚱鏁帮細杩涘叆椤甸潰锛孲TM32 绔嬪嵆璁╀綅
-    BusReleaseApp() {
-        BW16_Release_Bus();
+    // 进入页面：STM32 让位前必须先过独占闸门。
+    void onCreate() override {
+        entered_ = BW16_Enter_Bypass();
+        gate_failed_ = !entered_;
+        if (gate_failed_) Popup::showToast("UART BUSY");
     }
 
-    // 鏋愭瀯鍑芥暟锛氱寮€椤甸潰锛堟寜 BACK锛夛紝STM32 閲嶆柊鎷垮洖鎺у埗鏉?
-    ~BusReleaseApp() {
-        BW16_Restore_Bus();
+    // 离开页面：恢复失败时保持 FAULT 并提示，不静默重开普通流量。
+    void onDestroy() override {
+        if (!entered_) return;
+        if (!BW16_Exit_Bypass()) Popup::showToast("UART RESTORE FAIL");
+        entered_ = false;
     }
 
     Widget* buildUI() override {
@@ -27,8 +34,8 @@ public:
                 new Spacer(),
                 new Text("[ BYPASS MODE ]", 1, true),
                 new SizedBox(0, 6),
-                new Text("STM32 is Invisible", 1),
-                new Text("UART Pins Released", 1),
+                new Text(gate_failed_ ? "UART BUSY" : "STM32 is Invisible", 1),
+                new Text(gate_failed_ ? "Gate not claimed" : "UART Pins Released", 1),
                 new SizedBox(0, 6),
                 new Text("Use external tool", 1),
                 new Text("to flash BW16 now", 1),
@@ -41,4 +48,3 @@ public:
 };
 
 #endif
-

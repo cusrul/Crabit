@@ -1,4 +1,4 @@
-#include "qmi_wake_trace.h"
+#include "wake_log.h"
 #include <cassert>
 #include <cstdio>
 struct Bus {
@@ -15,40 +15,40 @@ struct Bus {
     }
 };
 int main() {
-    using namespace QmiWakeTrace;
-    last = {};
+    using QT = QmiWakeTrace;
+    QT::last = {};
     Bus b;
-    captureConfig(b, 0);
+    QT::captureConfig(b, 0);
     assert(b.calls == 0);
-    captureConfig(b, 0xD4);
-    assert(last.valid == 63 && b.calls == 6 && b.statusReads == 0);
-    assert(last.regs[0] == 2 && last.regs[5] == 12);
-    captureStatus(b, 0xD4);
+    QT::captureConfig(b, 0xD4);
+    assert(QT::last.valid == 63 && b.calls == 6 && b.statusReads == 0);
+    assert(QT::last.regs[0] == 2 && QT::last.regs[5] == 12);
+    QT::captureStatus(b, 0xD4);
     assert(b.statusReads == 0);
-    last.prepared = true;
-    captureStatus(b, 0xD4);
+    QT::last.prepared = true;
+    QT::captureStatus(b, 0xD4);
     assert(b.statusReads == 0);
-    last.motion = true;
-    captureStatus(b, 0xD4);
+    QT::last.motion = true;
+    QT::captureStatus(b, 0xD4);
     assert(b.statusReads == 0);  // Entry aborted: no clear.
-    last.returned = true;
-    captureStatus(b, 0);
+    QT::last.returned = true;
+    QT::captureStatus(b, 0);
     assert(b.statusReads == 0);
-    captureStatus(b, 0xD4);
-    assert(b.statusReads == 1 && last.statusOk && last.status == 4);
+    QT::captureStatus(b, 0xD4);
+    assert(b.statusReads == 1 && QT::last.statusOk && QT::last.status == 4);
     for (unsigned i = 1; i <= 6; ++i) {
-        last = {};
+        QT::last = {};
         Bus failed;
         failed.failAt = i;
-        captureConfig(failed, 0xD4);
-        assert(last.valid == (63 ^ (1u << (i - 1))) && failed.statusReads == 0);
+        QT::captureConfig(failed, 0xD4);
+        assert(QT::last.valid == (63 ^ (1u << (i - 1))) && failed.statusReads == 0);
     }
-    last = {};
-    last.prepared = last.motion = last.returned = true;
+    QT::last = {};
+    QT::last.prepared = QT::last.motion = QT::last.returned = true;
     Bus failed;
     failed.failAt = 1;
-    captureStatus(failed, 0xD4);
-    assert(!last.statusOk);
+    QT::captureStatus(failed, 0xD4);
+    assert(!QT::last.statusOk);
     puts(
         "PASS: register snapshot, no premature read-to-clear, absent sensor, partial read "
         "failures");

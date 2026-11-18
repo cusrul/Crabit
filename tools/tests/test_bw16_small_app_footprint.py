@@ -11,6 +11,7 @@ import unittest
 import os
 import tempfile
 from tools.tests.test_bw16_uart_ingress import extract_function
+from tools.tests.history_revisions import require_history
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = "164b4f4f24603ee68ac8770a0f48a41af2a19e82"
@@ -18,7 +19,8 @@ BASE = "164b4f4f24603ee68ac8770a0f48a41af2a19e82"
 # not be mistaken for part of the original two-file footprint-only change.
 FOOTPRINT_COMMIT = "549f3a3ab0b353a2f13994b35384184a0ad04ec0"
 MENU_BASE = "ce7a85c"  # User-accepted Chinese menu/placeholder cleanup.
-LAUNCHER = "firmware/rtl8720dn/NanoUI/app/launcher.h"
+LAUNCHER = "firmware/rtl8720dn/NanoUI/app/core/launcher.h"
+LAUNCHER_BASE = "firmware/rtl8720dn/NanoUI/app/launcher.h"
 CONFIG = "firmware/rtl8720dn/NanoUI/config.h"
 
 
@@ -84,22 +86,32 @@ class SmallAppFootprintTests(unittest.TestCase):
         self.assertEqual(selected, self.preprocess(launcher, enabled=1))
 
     def test_switch_off_and_lab_profiles_recover_original_launcher(self):
+        require_history(ROOT, MENU_BASE)
         launcher = (ROOT / LAUNCHER).read_text(encoding="utf-8")
         self.assertIn("std::vector<const char*> titles", launcher)
         self.assertNotIn("titles[i].c_str()", launcher)
         baseline = subprocess.check_output(
-            ["git", "show", f"{MENU_BASE}:{LAUNCHER}"], text=True, encoding="utf-8", cwd=ROOT
+            ["git", "show", f"{MENU_BASE}:{LAUNCHER_BASE}"], text=True, encoding="utf-8", cwd=ROOT
         )
 
         # SystemFolderApp now honors ENABLE_OTA; its feature behavior is tested
         # separately. All other historical launcher content must still match.
-        def normalize(source, profile):
+        def normalize(source, profile, historical=False):
             # The later verified menu fix borrows literal pointers instead of
             # dangling c_str() pointers from a destroyed vector<string>.
             source = source.replace(
                 "std::vector<std::string> titles", "std::vector<const char*> titles"
             )
             source = source.replace("std::vector<std::string>{", "std::vector<const char*>{")
+            if profile == 4:
+                # Ancestor 12706c1 restored the original game names after
+                # MENU_BASE. Accept only that exact historical label change.
+                old_titles = 'std::vector<const char*>{"城堡冒险", "立体迷宫", "立体跳跃"}'
+                new_titles = 'std::vector<const char*>{"Castle Boy", "Arduboy 3D", "Hopper"}'
+                expected = old_titles if historical else new_titles
+                self.assertEqual(source.count(expected), 1)
+                if historical:
+                    source = source.replace(old_titles, new_titles, 1)
             # The placeholder notice adopted the same explicitly chosen 8px UI;
             # do not normalize arbitrary widget sizes or actual profile choices.
             source = source.replace('new Text("暂无应用", 12)', 'new Text("暂无应用", 8)')
@@ -111,6 +123,17 @@ class SmallAppFootprintTests(unittest.TestCase):
             source = re.sub(
                 r"class SystemFolderApp.*?(?=class LauncherApp)", "", source, flags=re.S
             )
+            # Hopper is a managed port now: the reduced-profile menu routes it
+            # through the factory gate instead of constructing it directly.
+            # Normalize that intentional safety change for the historical diff.
+            source = re.sub(
+                r"template <typename T>\s*inline void launchPreparedArduboyApp\(\).*?\n\}",
+                "", source, count=1, flags=re.S
+            )
+            source = source.replace(
+                "launchPreparedArduboyApp<AppHopper>()",
+                "AppManager::launch(new AppHopper())",
+            )
             if profile == 5:  # Network-only intentionally excludes PAIR DIAG.
                 source = re.sub(
                     r"class BleFolderApp.*?(?=class GamesFolderApp)", "", source, flags=re.S
@@ -121,14 +144,33 @@ class SmallAppFootprintTests(unittest.TestCase):
             with self.subTest(profile=profile):
                 original = self.preprocess(baseline, enabled=0, profile=profile)
                 self.assertEqual(
-                    normalize(original, profile),
+                    normalize(original, profile, historical=True),
                     normalize(self.preprocess(launcher, enabled=0, profile=profile), profile),
                 )
                 if profile != 0:
                     self.assertEqual(
-                        normalize(original, profile),
+                        normalize(original, profile, historical=True),
                         normalize(self.preprocess(launcher, enabled=1, profile=profile), profile),
                     )
+
+    def test_reduced_games_profile_preserves_names_and_factory_order(self):
+        launcher = (ROOT / LAUNCHER).read_text(encoding="utf-8")
+        for enabled in (0, 1):
+            with self.subTest(enabled=enabled):
+                selected = self.preprocess(launcher, enabled=enabled, profile=4)
+                titles = 'std::vector<const char*>{"Castle Boy", "Arduboy 3D", "Hopper"}'
+                self.assertEqual(selected.count(titles), 1)
+                self.assertNotIn('"城堡冒险"', selected)
+                self.assertNotIn('"立体迷宫"', selected)
+                self.assertNotIn('"立体跳跃"', selected)
+                self.assertNotIn("new AppHopper()", selected)
+                self.assertRegex(
+                    selected,
+                    re.escape(titles) + r"\s*,\s*std::vector<VoidCallback>\s*\{\s*"
+                    r"\[\]\(\)\{\s*AppManager::launch\(new CastleBoyApp\(\)\);\s*\},\s*"
+                    r"\[\]\(\)\{\s*AppManager::launch\(new Arduboy3DApp\(\)\);\s*\},\s*"
+                    r"\[\]\(\)\{\s*launchPreparedArduboyApp<AppHopper>\(\);\s*\}\s*\}",
+                )
 
     def test_actual_product_menu_and_folder_back(self):
         selected = self.preprocess((ROOT / LAUNCHER).read_text(encoding="utf-8"), network=True)
@@ -215,10 +257,12 @@ int main(int argc,char** argv){
             "AppBleKbdTest",
             "CastleBoyApp",
             "Arduboy3DApp",
-            "AppHopper",
             "WifiToolsMenuApp",
         ):
             self.assertIn(f"new {app}()", selected)
+        # Hopper is a managed port: the menu uses the prepare/launch gate.
+        self.assertIn("launchPreparedArduboyApp<AppHopper>", selected)
+        self.assertNotIn("new AppHopper()", selected)
         self.assertIn("current_mode = MODE_OTA", selected)
         self.assertNotIn("new PairDiagApp()", selected)
         self.assertNotIn("new ProductNoticeApp()", selected)
@@ -256,22 +300,25 @@ int main(int argc,char** argv){
         selected = self.preprocess(
             (ROOT / LAUNCHER).read_text(encoding="utf-8"), profile=5, two_games=True
         )
-        for app in ("Arduboy3DApp", "AppHopper", "WifiToolsMenuApp"):
-            self.assertIn(f"new {app}()", selected)
+        self.assertIn("new Arduboy3DApp()", selected)
+        self.assertIn("launchPreparedArduboyApp<AppHopper>", selected)
+        self.assertNotIn("new AppHopper()", selected)
+        self.assertIn("new WifiToolsMenuApp()", selected)
         for app in ("CastleBoyApp", "AppBleMouse", "AppBlePPT", "AppBleKbdTest", "PairDiagApp"):
             self.assertNotIn(f"new {app}()", selected)
         self.assertNotIn("current_mode = MODE_OTA", selected)
 
     def test_single_game_network_selection(self):
         for game, included, excluded in (
-            (1, "Arduboy3DApp", "AppHopper"),
-            (2, "AppHopper", "Arduboy3DApp"),
+            (1, "new Arduboy3DApp()", "launchPreparedArduboyApp<AppHopper>"),
+            (2, "launchPreparedArduboyApp<AppHopper>", "new Arduboy3DApp()"),
         ):
             selected = self.preprocess(
                 (ROOT / LAUNCHER).read_text(encoding="utf-8"), profile=5, game=game
             )
-            self.assertIn(f"new {included}()", selected)
-            self.assertNotIn(f"new {excluded}()", selected)
+            self.assertIn(included, selected)
+            self.assertNotIn(excluded, selected)
+            self.assertNotIn("new AppHopper()", selected)
             self.assertNotIn("new CastleBoyApp()", selected)
             self.assertIn("new WifiToolsMenuApp()", selected)
 
@@ -316,6 +363,7 @@ int main(int argc, char**) {
             self.assertEqual(subprocess.run([str(exe), "fatal"]).returncode, 73)
 
     def test_original_footprint_commit_left_protected_paths_unchanged(self):
+        require_history(ROOT, BASE, FOOTPRINT_COMMIT)
         protected = [
             "firmware/stm32",
             "firmware/shared",

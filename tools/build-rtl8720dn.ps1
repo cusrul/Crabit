@@ -4,6 +4,7 @@ param(
     [string]$BuildPath,
     [switch]$ArduinoIdeDefaults,
     [switch]$MeasureBleSpam,
+    [switch]$ArduboyPorts,
     [string]$BleSpamLibrary,
     [switch]$TwoGames,
     [ValidateSet("none", "ardu3d", "hopper")]
@@ -13,12 +14,17 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $sketch = Join-Path $repoRoot "firmware\rtl8720dn\NanoUI"
+$stagingRoot = Join-Path $repoRoot "build\bw16-sketch-staging"
+$stagedSketch = Join-Path $stagingRoot "NanoUI"
 $authHeader = Join-Path $sketch "ble_auth.local.h"
 if (-not (Test-Path -LiteralPath $authHeader -PathType Leaf)) {
     throw "Missing private BLE configuration. Copy firmware/rtl8720dn/NanoUI/ble_auth.local.example.h to ble_auth.local.h and set your own six-digit code. Do not commit it. See docs/reproduction.md."
 }
 $rangeGuard = Join-Path $repoRoot "tools\check-bw16-image.ps1"
 $sharedProtocol = Join-Path $repoRoot "firmware\shared"
+# Single staging manifest shared with tools/build_bw16_split_games.py.
+# firmware/shared is the source of truth; do not add a second header list here.
+$sharedManifest = Join-Path $repoRoot "tools\bw16_shared_headers.json"
 $sharedNanoUi = Join-Path $repoRoot "libraries\NanoUI"
 if (-not $BleSpamLibrary) {
     $bundledBleSpam = Join-Path $repoRoot "libraries\BW16_BLE_Spam"
@@ -29,6 +35,56 @@ if (-not $BleSpamLibrary) {
 $nanoUiPreflight = Join-Path $repoRoot "firmware\rtl8720dn\NanoUI\src\NanoUI_Preflight.h"
 if ($ArduinoIdeDefaults -and $Profile -ne "product") {
     throw "Arduino IDE defaults validate only the sketch's default product profile."
+}
+
+if (-not (Test-Path -LiteralPath $sharedManifest -PathType Leaf)) {
+    throw "Shared-header manifest missing: $sharedManifest"
+}
+try {
+    $sharedSpec = Get-Content -LiteralPath $sharedManifest -Raw -Encoding UTF8 | ConvertFrom-Json
+} catch {
+    throw "Shared-header manifest unreadable: $sharedManifest ($($_.Exception.Message))"
+}
+if ($sharedSpec -isnot [System.Management.Automation.PSCustomObject]) {
+    throw "Shared-header manifest must be a JSON object"
+}
+$sharedAllowedKeys = @('$comment', "source_root", "staged_root", "headers")
+$sharedUnexpected = @($sharedSpec.PSObject.Properties.Name | Where-Object { $sharedAllowedKeys -cnotcontains $_ })
+if ($sharedUnexpected.Count -gt 0) {
+    throw "Shared-header manifest has unexpected keys: $($sharedUnexpected -join ', ')"
+}
+if ($sharedSpec.'$comment' -isnot [string]) {
+    throw "Shared-header manifest `$comment must document the source of truth"
+}
+# Exact, case-sensitive string match; no normalization, same rule as
+# tools/build_bw16_split_games.py.
+if ($sharedSpec.source_root -isnot [string] -or $sharedSpec.source_root -cne "firmware/shared" -or
+    $sharedSpec.staged_root -isnot [string] -or $sharedSpec.staged_root -cne "src/crabit_shared") {
+    throw "Shared-header manifest must stage firmware/shared into src/crabit_shared."
+}
+# @() would turn a bare string into a one-item list, so check the JSON type first.
+if ($sharedSpec.headers -isnot [array] -or $sharedSpec.headers.Count -eq 0) {
+    throw "Shared-header manifest must list headers as a non-empty array"
+}
+$sharedHeaders = @($sharedSpec.headers)
+foreach ($shared in $sharedHeaders) {
+    # \z, not $: $ would also match before a trailing newline; Python uses fullmatch.
+    if ($shared -isnot [string] -or $shared -cnotmatch '^[A-Za-z0-9][A-Za-z0-9._-]*\.h\z' -or
+        $shared.Contains("..") -or [System.IO.Path]::IsPathRooted($shared)) {
+        throw "Shared-header manifest header must be a plain file name: $shared"
+    }
+}
+# Case-insensitive duplicate rejection, matching Python's str.casefold() comparison.
+if ((@($sharedHeaders | ForEach-Object { $_.ToLowerInvariant() } | Sort-Object -Unique)).Count -ne $sharedHeaders.Count) {
+    throw "Shared-header manifest lists a header more than once"
+}
+foreach ($shared in $sharedHeaders) {
+    if (-not (Test-Path -LiteralPath (Join-Path $sharedProtocol $shared) -PathType Leaf)) {
+        throw "Shared-header manifest header missing from firmware/shared: $shared"
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $sketch "src\crabit_shared\$shared") -PathType Leaf)) {
+        throw "Shared-header manifest header has no sketch target: $shared"
+    }
 }
 
 if (-not $BuildPath) {
@@ -61,6 +117,12 @@ $profileId = @{
 $buildFlags = "-mthumb -DCORE_RTL8720DN -DBOARD_AITHINKER_BW16 " +
     "-DArduino_STD_PRINTF -DSTD_PRINTF -std=c++17 " +
     "-DCRABIT_BW16_PROFILE=$profileId -I$sharedProtocol"
+if ($ArduboyPorts) {
+    if ($Profile -ne "wifi-tools-lab" -or $ArduinoIdeDefaults) {
+        throw "Arduboy ports require explicit wifi-tools-lab without ArduinoIdeDefaults."
+    }
+    $buildFlags += " -DCRABIT_BW16_ARDUBOY_PORTS=1"
+}
 $compilerFlags = "-include $nanoUiPreflight"
 if ($Game -ne "none") {
     if ($ArduinoIdeDefaults -or $Profile -ne "wifi-tools-lab" -or $TwoGames) {
@@ -97,6 +159,15 @@ try {
     }
 
     New-Item -ItemType Directory -Force -Path $output | Out-Null
+    if (Test-Path -LiteralPath $stagingRoot) {
+        Remove-Item -LiteralPath $stagingRoot -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $stagingRoot | Out-Null
+    Copy-Item -LiteralPath $sketch -Destination $stagingRoot -Recurse -Force
+    foreach ($shared in $sharedHeaders) {
+        Copy-Item -LiteralPath (Join-Path $sharedProtocol $shared) `
+            -Destination (Join-Path $stagedSketch "src\crabit_shared\$shared") -Force
+    }
     if ($Profile -ne "product") {
         # Generated evidence marker, not a promise that a lab image is usable.
         "COMPILE/SIZE MEASUREMENT ONLY: $Profile. Not hardware accepted. Do not flash." |
@@ -125,7 +196,7 @@ try {
             "compiler.cpp.extra_flags=$compilerFlags"
         )
     }
-    $compileArguments += $sketch
+    $compileArguments += $stagedSketch
     if ($MeasureBleSpam) {
         $compileArguments += @("--build-property",
             "compiler.c.elf.extra_flags=-Wl,--undefined=crabit_ble_spam_size_probe,--undefined=_ZN14BW16BLESpammerC1Ev")
@@ -156,6 +227,9 @@ try {
     }
 }
 finally {
+    if (Test-Path -LiteralPath $stagingRoot) {
+        Remove-Item -LiteralPath $stagingRoot -Recurse -Force
+    }
     if ($lockHeld) {
         $mutex.ReleaseMutex()
     }

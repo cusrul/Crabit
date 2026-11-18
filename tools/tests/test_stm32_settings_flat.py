@@ -45,7 +45,9 @@ class FlatSettingsHostTests(unittest.TestCase):
                 FAKE,
                 UI / "app_real/app_settings.h",
                 UI / "app_real/components/settings_option_picker.h",
+                UI / "app_real/components/bw16_power_state.h",
                 ROOT / "firmware/stm32/Core/Inc/sys_config.h",
+                ROOT / "firmware/stm32/Core/Inc/bw16_voltage_config.h",
             )
             if not path.is_file()
         ]
@@ -75,6 +77,8 @@ class FlatSettingsHostTests(unittest.TestCase):
             "-I",
             str(ROOT / "firmware/stm32/Core/Inc"),
             "-I",
+            str(ROOT / "firmware/stm32/product/features/companion"),
+            "-I",
             str(SHARED / "src"),
             *map(str, sources),
             "-o",
@@ -101,14 +105,13 @@ class FlatSettingsHostTests(unittest.TestCase):
         print(result.stdout, end="")
         if snapshots:
             expected = (
+                "dirty_initial",
                 "initial",
                 "brightness_editing",
                 "brightness_editing_settled",
                 "off_editing",
                 "input_editing",
                 "actions_bottom",
-                "dirty_initial",
-                "bluetooth_on",
             )
             for name in expected:
                 image = Path(snapshots) / (name + ".bmp")
@@ -131,7 +134,17 @@ class FlatSettingsHostTests(unittest.TestCase):
         for forbidden in ("EventBus", "FreeRTOS.h", "task.h", "app_coproc.h", "BW16_"):
             self.assertNotIn(forbidden, app_text)
         self.assertEqual(app_text.count("ConfigManager::save()"), 1)
-        self.assertEqual(app_text.count("new SettingsOptionPicker("), 2)
+        self.assertEqual(app_text.count("new SettingsOptionPicker("), 3)
+        self.assertIn('"BW16 电压"', app_text)
+        self.assertIn('voltage_labels = {"3.0V", "3.1V", "3.2V"}', app_text)
+        self.assertIn("voltage_index = Crabit::Bw16Voltage::index();", app_text)
+        self.assertIn("Crabit::Bw16Power::availability()", app_text)
+        self.assertIn("Crabit::Bw16Voltage::setIndex(voltage_index)", app_text)
+        self.assertIn("voltageEditable", app_text)
+        self.assertNotIn("AXP2101_SetDC3Voltage", app_text)
+        self.assertNotIn("AXP2101_SetDC3Enable", app_text)
+        self.assertIn("createRenderObject", picker_text)
+        self.assertEqual(picker_text.count("NanoUI::Callback<bool()> editable = {}"), 2)
         self.assertIn("new Slider(brightness, 1.0f, 28", app_text)
         self.assertIn("new Container(new SlidingText(&title, 8), 128, 12)", app_text)
         self.assertIn('"%d%%"', app_text)

@@ -87,6 +87,7 @@ class _NativeFixture(unittest.TestCase):
                 raise AssertionError(f"production source not available: {path}")
         include_dirs = [
             FAKES,
+            STM / "Core/Inc",
             USB / "Composite",
             USB / "App",
             LIB / "Core/Inc",
@@ -179,6 +180,7 @@ for _name in (
     "keyboard_completion",
     "led_out",
     "flash_rx",
+    "line_coding_gate",
     "reset_cycles",
     "allocation_failure",
     "flash_queue_sof",
@@ -186,6 +188,25 @@ for _name in (
     "get_report",
 ):
     setattr(STM32UsbRealStackTests, "test_" + _name, _case(_name))
+
+
+TOPIC_LITERALS = {
+    "Topics::SysMode": '"sys/mode"',
+    "Topics::SysBtn": '"sys/btn"',
+    "Topics::SysSns": '"sys/sns"',
+    "Topics::SnsAll": '"sns/all"',
+}
+
+
+def normalize_topics(text):
+    text = text.lstrip('\ufeff').replace('\r\n', '\n')
+    text = text.replace('#include "topics.h"\n', '')
+    text = text.replace('#include "i2c.h"\n', '')
+    text = re.sub(r'AXP2101_(\w+)\(&hi2c1,\s*', r'AXP2101_\1(', text)
+    text = re.sub(r'AXP2101_(\w+)\(&hi2c1\)', r'AXP2101_\1()', text)
+    for constant, literal in TOPIC_LITERALS.items():
+        text = text.replace(constant, literal)
+    return text
 
 
 def _function(text, signature):
@@ -239,16 +260,19 @@ class STM32UsbSourceGuards(unittest.TestCase):
         # Normalize checkout newlines and UTF-8 BOM. This pins subsequent changes; historical
         # Git comparison is performed when updating these fingerprints, not at runtime.
         snapshots = {
-            "Core/NanoUI/app_real/app_coproc.h": "fb9fda2bd05066ac8031202c586d706ea288b812dede3fdb839fc1bdf5369a06",
+            # Updated once for the user-authorized BW16 3.0/3.1/3.2 V target: one
+            # include plus the saved-value DCDC3 call. Boot order/delays and the
+            # rest of the protected header are unchanged (see test_stm32_ameba_frame).
+            "Core/NanoUI/app_real/app_coproc.h": "48ea6104f8a5512e44d6cbc9cb3e4956089be14246f2dc40892c5d9aa5c9ac93",
         }
         for name, expected in snapshots.items():
             with self.subTest(path=name):
-                text = (STM / name).read_text(encoding="utf-8-sig")
+                text = normalize_topics((STM / name).read_text(encoding="utf-8-sig"))
                 self.assertEqual(hashlib.sha256(text.encode("utf-8")).hexdigest(), expected)
         # The later verified UI localization changed labels/layout, not bridge
         # lifetime. Protect the actual non-render callbacks rather than old UI text.
         relative = "firmware/stm32/Core/NanoUI/app_real/app_bw16_flash.h"
-        current = (ROOT / relative).read_text(encoding="utf-8-sig")
+        current = normalize_topics((ROOT / relative).read_text(encoding="utf-8-sig"))
 
         def logic(text):
             text = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.S)
@@ -260,7 +284,7 @@ class STM32UsbSourceGuards(unittest.TestCase):
         # need not contain private development history to run this guard.
         callback_hashes = {
             "void onCreate()": "ba379d6202c1407b3e460408abe01d5a88617012accf0ec468ddb1e32b14e9e3",
-            "void onDestroy()": "2c7e527c23f511bef3ea2dda02c277fe806ee89bc8922da8bf70f83f1adbd3ab",
+            "void onDestroy()": "d51c41c42fd829fc9355ccaf649e429d39610c5dedd67229a6899648bc29ca94",
             "void onTick()": "18120e5f98a56fad9ba49c17ed576e1f8cc9a4d59be67f220b5d71db1406c191",
         }
         for signature, expected in callback_hashes.items():
@@ -268,14 +292,15 @@ class STM32UsbSourceGuards(unittest.TestCase):
                 hashlib.sha256(logic(_function(current, signature)).encode("utf-8")).hexdigest(),
                 expected,
             )
-        self.assertEqual(current.count("BW16_Dedicated_Bridge();"), 2)  # declaration + UI action
+        self.assertEqual(current.count("BW16_Dedicated_Bridge();"), 1)  # declaration
+        self.assertIn("if (!BW16_Dedicated_Bridge())", current)  # UI action reports failure
         helper = _function(
-            (STM / "Core/Src/nanoui_port.cpp").read_text(encoding="utf-8"),
-            'extern "C" bool STM32_PrepareAmebaUartRx(void)',
+            (STM / "Core/Src/uart_task.cpp").read_text(encoding="utf-8"),
+            'bool STM32_PrepareAmebaUartRx(void)',
         )
         self.assertEqual(
             hashlib.sha256(helper.encode("utf-8")).hexdigest(),
-            "25cafb185da46a7eb8f26959a9980c38576cb3a9d4400de342ed199ba3513be9",
+            "c1e80bdad1f24dc055e2febef05a4b9128cda0e2ef3e07c13359189e931c71f6",
         )
 
 

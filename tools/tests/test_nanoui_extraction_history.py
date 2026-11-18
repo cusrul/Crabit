@@ -8,6 +8,7 @@ import re
 import subprocess
 import unittest
 
+from tools.tests.history_revisions import require_history
 from tools.tests.test_nanoui_original_extraction import (
     BASE,
     PIECES,
@@ -41,6 +42,7 @@ class HistoricalExtractionTests(unittest.TestCase):
                     self.assertNotIn("class ", text)
 
     def test_historical_product_scope(self):
+        require_history(ROOT, BASE, EXTRACTION)
         changed = subprocess.check_output(
             [
                 "git",
@@ -60,6 +62,7 @@ class HistoricalExtractionTests(unittest.TestCase):
         self.assertFalse(unexpected, unexpected)
 
     def test_historical_core_has_no_sdk_or_reverse_product_includes(self):
+        require_history(ROOT, EXTRACTION)
         paths = subprocess.check_output(
             ["git", "ls-tree", "-r", "--name-only", EXTRACTION, "--", "libraries/NanoUI/src"],
             cwd=ROOT,

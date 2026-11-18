@@ -163,6 +163,12 @@ def load_config(filename):
         isinstance(s, str) and s.isidentifier() for s in helpers
     ):
         raise ValueError("text_helpers must be function identifier strings")
+    provider_path = cpp.parent / "nanoui_font_provider.cpp"
+    if provider and provider_path in (header, cpp):
+        raise ValueError(
+            "Generated font provider collides with an output resource path; "
+            "rename output_h/output_cpp or set font_provider to false"
+        )
     return ResourceConfig(
         path,
         sources,

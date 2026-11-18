@@ -10,12 +10,13 @@ from tools.tests.test_companion_uart_probe import function
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "firmware/stm32/Core/Src/nanoui_port.cpp"
+SOURCE = ROOT / "firmware/stm32/Core/Src/uart_task.cpp"
 LOOP_SIGNATURE = "for (uint16_t i = 0; i < total_len; i++)"
 
 
 HARNESS_BEFORE_LOOP = r"""
 #include "crabit_wire.h"
+#include "topics.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -46,13 +47,45 @@ enum Event { TimeRx, TimeQueued };
 void message(const char*, const char*, uint16_t) { ++trace_messages; }
 void record(Event, uint16_t, uint32_t, uint32_t = 0) { ++trace_records; }
 }
+bool amebaSessionActive() { return true; }
 }
+namespace CrabitTone {
+struct ToneCall {
+    std::string value;
+    size_t length;
+    uint16_t request_id;
+    bool session;
+    uint32_t now;
+};
+std::vector<ToneCall> tone_calls;
+bool handleFrame(const char* value, size_t length, uint16_t request_id,
+                 bool session, uint32_t now) {
+    ToneCall call;
+    call.value.assign(value, length);
+    call.length = length;
+    call.request_id = request_id;
+    call.session = session;
+    call.now = now;
+    tone_calls.push_back(call);
+    return true;
+}
+}
+volatile bool g_coproc_active = false;
+uint32_t HAL_GetTick() { return 0; }
 namespace EventBus {
 bool enqueueMessage(const CrabitWire::Message& message) {
     ui_messages.push_back(message);
     return true;
 }
 }
+
+class LinkQueue {
+public:
+    static bool enqueueUi(const CrabitWire::Message& message) {
+        ui_messages.push_back(message);
+        return true;
+    }
+};
 
 void parse_chunk(uint8_t* raw_data, uint16_t total_len) {
 """
@@ -236,6 +269,32 @@ int main(int argc, char** argv) {
         assert(trace_frames == 1 && ui_messages.size() == 1);
         assert_message(0, 999, "sys/notify", "inside");
         assert(trace_bad_frames > 0 && stitch_idx < CrabitWire::FRAME_SIZE);
+    } else if (mode == "tone_route") {
+        // The extracted Task_Modem loop must route only the exact app/tone topic
+        // to the tone handoff, consume it once, and keep every other topic on
+        // the existing UI/telemetry paths.
+        feed(make_frame("app/tone", "440,30", 0), 512);
+        assert(CrabitTone::tone_calls.size() == 1);
+        assert(CrabitTone::tone_calls[0].value == "440,30" && CrabitTone::tone_calls[0].length == 6);
+        assert(CrabitTone::tone_calls[0].request_id == 0 && CrabitTone::tone_calls[0].session);
+        assert(CrabitTone::tone_calls[0].now == 0);
+        assert(ui_messages.empty());
+        assert(trace_frames == 1);
+
+        feed(make_frame("app/tone2", "ordinary", 0), 512);
+        assert(CrabitTone::tone_calls.size() == 1);
+        assert(ui_messages.size() == 1);
+        assert_message(0, 0, "app/tone2", "ordinary");
+
+        feed(make_frame("diag/radio", "ignored", 0), 512);
+        assert(CrabitTone::tone_calls.size() == 1);
+        assert(ui_messages.size() == 1);
+
+        feed(make_frame("sys/notify", "done", 0), 512);
+        assert(CrabitTone::tone_calls.size() == 1);
+        assert(ui_messages.size() == 2);
+        assert_message(1, 0, "sys/notify", "done");
+        assert(trace_frames == 4);
     } else {
         assert(false && "unknown test mode");
     }
@@ -312,6 +371,9 @@ class Stm32WireStreamTest(unittest.TestCase):
 
     def test_crc_failed_candidate_does_not_hide_nested_valid_frame(self):
         self.run_case("nested")
+
+    def test_tone_route_consumes_exactly_the_exact_app_tone_topic(self):
+        self.run_case("tone_route")
 
 
 if __name__ == "__main__":

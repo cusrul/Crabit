@@ -1,9 +1,9 @@
 #include "i2c_recovery_policy.h"
-#include "wake_diag_format.h"
+#include "wake_log.h"
 #include <cassert>
 #include <cstring>
 #include <cstdio>
-using I2cRecovery::Result;
+using Result = I2cRecovery::Result;
 
 struct Pins {
     bool clockHigh = true, dataHigh = true, gpio = false, clockDrivenLow = false;

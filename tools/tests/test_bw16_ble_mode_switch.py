@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "firmware/rtl8720dn/NanoUI/app/app_ble_spam.h"
+SOURCE = ROOT / "firmware/rtl8720dn/NanoUI/app/apps/wireless/app_ble_spam.h"
 FAKE = r'''
 #include <cstdint>
 #include <cassert>

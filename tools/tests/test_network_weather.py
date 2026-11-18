@@ -719,8 +719,8 @@ class NetworkWeatherHostTests(unittest.TestCase):
         production_files = {
             ROOT / "firmware/shared/weather_contract.h": shared / "weather_contract.h",
             ROOT / "firmware/shared/crabit_wire.h": shared / "crabit_wire.h",
-            ROOT / "firmware/stm32/Core/Inc/network_weather.h": inc / "network_weather.h",
-            ROOT / "firmware/stm32/Core/Src/network_weather.cpp": src / "network_weather.cpp",
+            ROOT / "firmware/stm32/product/features/network/network_weather.h": inc / "network_weather.h",
+            ROOT / "firmware/stm32/product/features/network/network_weather.cpp": src / "network_weather.cpp",
         }
         for original, copied in production_files.items():
             shutil.copyfile(original, copied)
@@ -741,6 +741,8 @@ class NetworkWeatherHostTests(unittest.TestCase):
                 "-std=c++17",
                 "-I",
                 str(inc),
+                "-I",
+                str(shared),
                 str(src / "network_weather.cpp"),
                 str(driver),
                 "-o",

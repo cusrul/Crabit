@@ -79,7 +79,7 @@ static void fake_disable_dma_it(void*, uint32_t it) {
 // PRODUCTION_HELPER_INSERTION_POINT
 static int failed;
 #define CHECK(v) do { if (!(v)) { fprintf(stderr, "helper FAIL line %d: %s\n", __LINE__, #v); ++failed; } } while (0)
-extern "C" bool STM32_PrepareAmebaUartRx(void);
+bool STM32_PrepareAmebaUartRx(void);
 
 static void reset(bool uart_irq, bool dma_irq, bool tx_irq, uint32_t idx) {
     enabled[USART1_IRQn] = uart_irq;

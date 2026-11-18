@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "libraries/NanoUI/tools"))
 from nanoui_tools.config import load_config
 from nanoui_tools.fonts import generate_font_blocks, scan_config, FONT_CPP_MARKER
+from tools.tests.history_revisions import require_history
 
 ASSET = "firmware/rtl8720dn/NanoUI/src/nanoui_assets.cpp"
 BASE = "adc03b6"
@@ -32,6 +33,19 @@ def glyphs(source):
 
 
 class ProductFontTests(unittest.TestCase):
+    def test_game_category_menu_has_8px_glyphs(self):
+        registry = (ROOT / "firmware/rtl8720dn/NanoUI/app/arduboy30_registry.h").read_text(
+            encoding="utf-8"
+        )
+        category_labels = re.findall(r'case Category::\w+: return "([^"]+)";', registry)
+        self.assertEqual(len(category_labels), 5)
+        records = glyphs((ROOT / ASSET).read_text(encoding="utf-8"))
+        for label in category_labels:
+            for char in label:
+                with self.subTest(label=label, char=char):
+                    self.assertIn((ord(char), 8, 0), records)
+                    self.assertTrue(any(records[ord(char), 8, 0][1]))
+
     def test_network_trial_pool_is_reproducible_and_separate(self):
         config = load_config(ROOT / "firmware/rtl8720dn/NanoUI/nanoui-network-assets.json")
         chars, art, sizes = scan_config(config)
@@ -62,6 +76,7 @@ class ProductFontTests(unittest.TestCase):
         )
 
     def test_existing_glyph_shapes_and_media_preserved(self):
+        require_history(ROOT, BASE)
         original = subprocess.check_output(["git", "show", f"{BASE}:{ASSET}"], cwd=ROOT).decode(
             "utf-8"
         )

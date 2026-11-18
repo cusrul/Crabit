@@ -2,14 +2,16 @@
 #define APP_SETTINGS_H
 
 #include "NanoUI/NanoUI.h"
+#include "display.h"
 #include "components/action_button.h"
 #include "components/settings_option_picker.h"
+#include "components/bw16_power_state.h"
+#include "bw16_voltage_config.h"
 #include "sys_config.h"
 #include "global_store.h"
 #include <cmath>
 #include <cstdio>
 
-extern "C" void OLED_WR_Byte(uint8_t dat, uint8_t cmd);
 #if CRABIT_UI_ALLOC_DIAG
 extern "C" void STM32_UiPoolCheckpoint(unsigned stage);
 #endif
@@ -28,12 +30,14 @@ class SettingsApp : public Application {
     bool key_sound = true, key_led = true, save_failed = false;
     float volume = 100, led_level = 8;
     int off_index = 0, face_index = 0;
+    int voltage_index = 0;
     uint32_t original_off = 0, original_sleep = 0;
     bool display_previewed = false;
     NanoUI::NanoUIText title = "设置", brightness_text;
     NanoUI::StaticVector<const char*, 8> off_labels;
     NanoUI::StaticVector<const char*, 8> face_labels = {"反白底栏", "点阵", "极简", "左右分区",
                                                         "双行时刻"};
+    NanoUI::StaticVector<const char*, 8> voltage_labels = {"3.0V", "3.1V", "3.2V"};
 
     static float validBrightness(float value) {
         return std::isfinite(value) && value >= 0.0f && value <= 1.0f ? value : 0.5f;
@@ -56,7 +60,9 @@ class SettingsApp : public Application {
         return deep_sleep_enabled ? (original_sleep ? original_sleep : 10000u) : 0u;
     }
 
-    bool changed() const {
+    bool voltageChanged() const { return voltage_index != Crabit::Bw16Voltage::index(); }
+
+    bool otherChanged() const {
         const auto& p = CrabitPreferences::current;
         return save_failed || pat_input != CrabitPreferences::enabled(CrabitPreferences::Pat) ||
                qmi_input != CrabitPreferences::enabled(CrabitPreferences::Qmi) ||
@@ -69,6 +75,24 @@ class SettingsApp : public Application {
                sleepDelay() != sys_cfg.deep_sleep_ms || face_index != sys_cfg.watch_face;
     }
 
+    bool changed() const { return voltageChanged() || otherChanged(); }
+
+    // Guarded before the picker enters edit mode. Apply re-checks at save time;
+    // this early check only keeps an obviously impossible draft from starting.
+    static bool voltageEditable() {
+        switch (Crabit::Bw16Power::availability()) {
+        case Crabit::Bw16Power::Availability::Off:
+            return true;
+        case Crabit::Bw16Power::Availability::Unreadable:
+            Popup::showToast("电源状态未知");
+            return false;
+        case Crabit::Bw16Power::Availability::Running:
+            Popup::showToast("请先关闭BW16");
+            return false;
+        }
+        return false;
+    }
+
     void updateLabels() {
         char percent[8];
         std::snprintf(percent, sizeof(percent), "%d%%",
@@ -79,12 +103,7 @@ class SettingsApp : public Application {
 
     // Retain the existing OLED preview commands; no power-domain changes.
     static void previewBrightness(float value) {
-        OLED_WR_Byte(0x81, 0);
-        OLED_WR_Byte(static_cast<uint8_t>(value * 255.0f), 0);
-        OLED_WR_Byte(0xD9, 0);
-        OLED_WR_Byte(value < 0.15f ? 0x11 : 0x22, 0);
-        OLED_WR_Byte(0xDB, 0);
-        OLED_WR_Byte(value < 0.15f ? 0x00 : 0x20, 0);
+        Display::setBrightness(value);
     }
 
     void onBrightness(float value) {
@@ -96,7 +115,7 @@ class SettingsApp : public Application {
 
     void onInvert(bool value) {
         inverted = value;
-        OLED_WR_Byte(inverted ? 0xA7 : 0xA6, 0);
+        Display::setInvert(inverted);
         display_previewed = true;
         updateLabels();
     }
@@ -104,6 +123,20 @@ class SettingsApp : public Application {
     void apply() {
         if (!changed()) {
             Popup::showToast("没有修改");
+            return;
+        }
+        // The BW16 target is the only field that needs the radio to be off.
+        // Re-check here, not only when the page opened or the picker was used.
+        const bool voltage_pending = voltageChanged();
+        Crabit::Bw16Power::Availability voltage_state = Crabit::Bw16Power::Availability::Off;
+        if (voltage_pending) voltage_state = Crabit::Bw16Power::availability();
+        const bool voltage_blocked =
+            voltage_pending && voltage_state != Crabit::Bw16Power::Availability::Off;
+        if (voltage_blocked && !otherChanged()) {
+            // Nothing else to persist: keep the stored target untouched.
+            Popup::showToast(voltage_state == Crabit::Bw16Power::Availability::Unreadable
+                                 ? "电源状态未知 电压未改"
+                                 : "BW16运行 电压未改");
             return;
         }
         // Commit only this page's fields, never a stale whole-config snapshot.
@@ -121,10 +154,25 @@ class SettingsApp : public Application {
         p.volume = uint8_t(volume);
         p.led_level = uint8_t(led_level);
         GlobalStore.sys_volume = p.volume;
+        // Applying other settings must never overwrite the stored target; the
+        // trailer is only changed when the voltage draft was accepted here.
+        const Crabit::Bw16Voltage::Record previous_voltage = Crabit::Bw16Voltage::current;
+        if (voltage_pending && !voltage_blocked) Crabit::Bw16Voltage::setIndex(voltage_index);
         const auto result = ConfigManager::save();  // Existing storage driver/address, unchanged.
+        // Never leave a target that was not persisted active in RAM: the next
+        // boot would otherwise apply it. The draft stays pending for a retry.
+        if (result != ConfigManager::SaveResult::Saved)
+            Crabit::Bw16Voltage::current = previous_voltage;
         save_failed = result != ConfigManager::SaveResult::Saved;
         updateLabels();
-        Popup::showToast(result == ConfigManager::SaveResult::Saved ? "已应用" : "保存失败");
+        if (result != ConfigManager::SaveResult::Saved)
+            Popup::showToast("保存失败");
+        else if (voltage_blocked)
+            Popup::showToast(voltage_state == Crabit::Bw16Power::Availability::Unreadable
+                                 ? "已应用 电压未读"
+                                 : "已应用 电压未改");
+        else
+            Popup::showToast("已应用");
     }
 
     static Widget* settingRow(const char* label, Widget* control) {
@@ -149,6 +197,7 @@ class SettingsApp : public Application {
         off_index = timeIndex(original_off, off_times, off_custom);
         deep_sleep_enabled = original_sleep != 0;
         face_index = Crabit::validWatchFace(sys_cfg.watch_face);
+        voltage_index = Crabit::Bw16Voltage::index();
         pat_input = CrabitPreferences::enabled(CrabitPreferences::Pat);
         qmi_input = CrabitPreferences::enabled(CrabitPreferences::Qmi);
         key_sound = CrabitPreferences::enabled(CrabitPreferences::Sound);
@@ -171,7 +220,7 @@ class SettingsApp : public Application {
         // the current committed display settings, also after an earlier Apply.
         if (display_previewed) {
             previewBrightness(validBrightness(sys_cfg.brightness));
-            OLED_WR_Byte(sys_cfg.invert_disp ? 0xA7 : 0xA6, 0);
+            Display::setInvert(sys_cfg.invert_disp);
         }
     }
 
@@ -213,6 +262,9 @@ class SettingsApp : public Application {
                                                         [this](float) { updateLabels(); })),
                       settingRow("表盘",
                                  new SettingsOptionPicker(&face_index, face_labels, changedValue)),
+                      settingRow("BW16 电压",
+                                 new SettingsOptionPicker(&voltage_index, voltage_labels,
+                                                          changedValue, voltageEditable)),
                       new SizedBox(0, 4),
                       new Row({new Spacer(), new ActionButton("应用", [this]() { apply(); }),
                                new SizedBox(8, 0),

@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-PORT = ROOT / "firmware/stm32/Core/Src/nanoui_port.cpp"
+PORT = ROOT / "firmware/stm32/Core/Src/uart_task.cpp"
 HAL_UART = ROOT / "firmware/stm32/Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_uart.c"
 BOOT = ROOT / "firmware/stm32/Core/NanoUI/app_real/app_coproc.h"
 FAKES = ROOT / "tools/tests/ameba_frame_fakes"
@@ -31,7 +31,7 @@ def extract_function(text, signature):
 class STM32AmebaUartRxTests(unittest.TestCase):
     def test_extracted_production_helper_with_hal_api_mocks(self):
         production = extract_function(
-            PORT.read_text(encoding="utf-8"), 'extern "C" bool STM32_PrepareAmebaUartRx(void)'
+            PORT.read_text(encoding="utf-8"), 'bool STM32_PrepareAmebaUartRx(void)'
         )
         compiler = next(
             (
@@ -72,7 +72,7 @@ class STM32AmebaUartRxTests(unittest.TestCase):
         self.assertIn("HAL_UART_RxCpltCallback", dma_complete)
         self.assertIn("HAL_UART_RECEPTION_TOIDLE", dma_complete)
         body = extract_function(
-            PORT.read_text(encoding="utf-8"), 'extern "C" bool STM32_PrepareAmebaUartRx(void)'
+            PORT.read_text(encoding="utf-8"), 'bool STM32_PrepareAmebaUartRx(void)'
         )
         for forbidden in (
             "MX_USART1_UART_Init",

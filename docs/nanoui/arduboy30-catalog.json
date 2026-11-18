@@ -1,0 +1,887 @@
+{
+  "schema": "crabit-arduboy30-catalog-v1",
+  "updated": "2026-11-17",
+  "outcome": "21 additional Arduboy games retained after stopping expansion (not 30, not 15); each port independently selectable; the six built-in games remain always-on rows in the same 27-row C++ registry with five gameplay categories; the default six-game menu is unchanged; the arduboy30 name is kept for compatibility",
+  "existing_games_excluded": [
+    "hollow",
+    "hopper",
+    "lasers",
+    "samegame",
+    "arduboy3d",
+    "castle_boy"
+  ],
+  "template_excluded": "skeleton",
+  "selection": {
+    "macro": "CRABIT_ARDUBOY30_COUNT",
+    "generated_header": "app/arduboy30_selected.h",
+    "builder_option": "--arduboy30 <id|all>",
+    "default": "no catalogue port compiled or listed; the six built-in rows remain"
+  },
+  "capacity": {
+    "pilot4_real_build": {
+      "report": "build/arduboy30-pilot4-link-experiment-retry1-20261116/report.json",
+      "ids": [
+        "ardubullets",
+        "bananonsense",
+        "chiemagari",
+        "chribocchi"
+      ],
+      "main_bytes": 999424,
+      "strict_target_bytes": 999424,
+      "extension_bytes": 142496,
+      "sdk_archive_unchanged": true,
+      "hardware": "NOT TESTED",
+      "note": "real four-port split link, not the 21-port set; no 21-game fit is claimed"
+    },
+    "extension_bytes_max": 987136,
+    "recorded_bss_bytes": 75108,
+    "recorded_no_cache_bytes": 23932,
+    "recorded_heap_bytes": 260096,
+    "note": "historical four-port link evidence, not measured runtime heap; superseded by the measured_evidence all-27 build"
+  },
+  "measured_evidence": {
+    "date": "2026-11-17",
+    "selection": "all 21 additional ports plus the six built-in rows (27 registry entries; gameplay categories 4/10/8/3/2)",
+    "report": "build/arduboy27-flash-migration-20261117/report.json",
+    "artifact_check": "build/flash-migration-evidence-20261117/all27-artifact-check.json",
+    "staged_source_check": "build/flash-migration-evidence-20261117/all27-source-check.json",
+    "comparison": "build/flash-migration-evidence-20261117/all27-comparison.json",
+    "status": "PASS",
+    "main_bytes": 958464,
+    "main_physical_end": "0xF0000",
+    "main_sha256": "85689207832405f45542f7a69096fe814d7ee1883cbd87110aeee6522a81508f",
+    "main_target_bytes": 999424,
+    "main_target_spare_bytes": 40960,
+    "packed_main_bytes_saved": 40960,
+    "extension_bytes": 380192,
+    "extension_end": "0x163D20",
+    "extension_sha256": "2f90105ccb42d0478989db08383ab80a8d7cd796bdf9d451751f2d77f02cb0af",
+    "extension_spare_bytes": 606944,
+    "ram_region_bytes": 487424,
+    "ram_allocated_bytes": 475680,
+    "ram_unallocated_bytes": 11744,
+    "fixed_heap_bytes": 260096,
+    "named_mutable_bytes": 610,
+    "named_mutable_before_bytes": 50286,
+    "resource_sections_moved": 5,
+    "resource_bytes_moved": 31406,
+    "math_members": 29,
+    "math_bytes": 11141,
+    "math_added_bytes": 9796,
+    "stages": [
+      "compile_link",
+      "extension_checks",
+      "symbol_checks",
+      "main_only_extract",
+      "fresh_stock_pack",
+      "strict_range_check"
+    ],
+    "sdk_archive_unchanged": true,
+    "hardware": "NOT TESTED",
+    "default6": {
+      "report": "build/arduboy27-flash-migration-default6-20261117/report.json",
+      "main_bytes": 966656,
+      "main_physical_end": "0xF2000",
+      "main_sha256": "882b6c78b244151e135f2dcfa0d17f8849993ca16442f9b5c4062b9ebc218dec",
+      "main_target_spare_bytes": 32768,
+      "packed_main_bytes_saved": 28672,
+      "extension_bytes": 143600,
+      "extension_end": "0x12A0F0",
+      "extension_sha256": "bd71fefa926dbab121f058d4ceac7504773deff69c7436a48bae640e560e480d",
+      "extension_spare_bytes": 843536,
+      "ram_allocated_bytes": 475040,
+      "ram_unallocated_bytes": 12384,
+      "fixed_heap_bytes": 260096,
+      "resource_sections_moved": 5,
+      "math_members": 0
+    },
+    "single_ardubullets": {
+      "report": "build/arduboy27-flash-migration-single-20261117/report.json",
+      "status": "PASS",
+      "main_bytes": 954368,
+      "extension_bytes": 171008,
+      "math_members": 29,
+      "resource_sections_moved": 5,
+      "hardware": "NOT TESTED"
+    },
+    "note": "Flash migration: five exact read-only resource sections (31,406 B) move to .extflash byte-identically and the packed main drops 40,960 B to 958,464 B, leaving the same amount under the unchanged 999,424 B target; extension uses 380,192 B with 606,944 B spare. RAM layout and menu selection are unchanged. The exact libm table has 29 members and is added only for a non-empty catalogue selection (no whole-library pattern); the default-six profile emits no math patterns, so its larger main image is not evidence of a missing game. All-27, default6 and single-ardubullets real split builds pass; audio is the shared bounded mono adapter over app/tone. Only 21 catalogue ports plus Hopper use on-demand States; five built-ins keep static engines. Host State/save peak is not target heap; runtime heap, fragmentation and simultaneous suspended states remain unmeasured on the watch."
+  },
+  "games": [
+    {
+      "id": "ardubullets",
+      "title": "ARDUBULLET",
+      "genre": "Shmups",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "ardubullets",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "namespace": "ArdubulletsSandbox",
+      "app_class": "ArdubulletsApp",
+      "menu_label": "ARDUBULLET",
+      "control_risk": "tilt moves the ship; PAT single tap is B and fires one four-shot burst; auto fire is ON by default only in the real battle state and the pause menu toggles it for the session; PAT double tap is A and opens the pause/menu or toggles sound; PAT hold exits",
+      "notes": "pilot port; host tests PASS; all-27 and single-game real split builds PASS (build/arduboy27-flash-migration-20261117/report.json and build/arduboy27-flash-migration-single-20261117/report.json); watch hardware not tested",
+      "index": 0,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_ardubullets.py"
+    },
+    {
+      "id": "bananonsense",
+      "title": "Bananonsense",
+      "genre": "Joke",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "bananonsense",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "namespace": "BananonsenseSandbox",
+      "app_class": "BananonsenseApp",
+      "menu_label": "Bananonsense",
+      "control_risk": "tilt moves menus and the field cursor; PAT single tap is B and confirms; PAT double tap is A and opens the in-game menu or toggles sound; PAT hold exits",
+      "notes": "pilot port; host tests PASS; the real all-27 split build now passes (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 1,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_bananonsense.py"
+    },
+    {
+      "id": "chiemagari",
+      "title": "Chie Magari Ita",
+      "genre": "Puzzle",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "chiemagari",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "namespace": "ChiemagariSandbox",
+      "app_class": "ChiemagariApp",
+      "menu_label": "Chie Magari Ita",
+      "control_risk": "tilt moves the cursor; PAT single tap is B and picks/releases/confirms; PAT double tap is A and enters rotate mode, opens the menu or continues; rotation/flip needs a tilt direction during the A pulse and continuous rotation is not claimed; PAT hold exits",
+      "notes": "pilot port; host tests PASS; the real all-27 split build now passes (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 2,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_chiemagari.py"
+    },
+    {
+      "id": "chribocchi",
+      "title": "Chri-Bocchi Cat",
+      "genre": "Action",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "chribocchi",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "namespace": "ChribocchiSandbox",
+      "app_class": "ChribocchiApp",
+      "menu_label": "Chri-Bocchi Cat",
+      "control_risk": "tilt left/right moves the cat, tilt down meows; PAT single tap is A and double tap B; both select, pause/resume and leave record/credit screens; PAT hold exits",
+      "notes": "pilot port; host tests PASS; the real all-27 split build now passes (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 3,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_chribocchi.py"
+    },
+    {
+      "id": "evasion",
+      "title": "Evasion",
+      "genre": "Action",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "evasion",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "namespace": "EvasionSandbox",
+      "app_class": "EvasionApp",
+      "menu_label": "Evasion",
+      "control_risk": "tilt left/right moves the runner; PAT single tap is B and confirms/restarts; PAT double tap is A and pauses/opens menus; no sustained A/B input; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 4,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_evasion.py"
+    },
+    {
+      "id": "knightmove",
+      "title": "Knight Move",
+      "genre": "Action-Puzzle",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "knightmove",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "namespace": "KnightMoveSandbox",
+      "app_class": "KnightMoveApp",
+      "menu_label": "Knight Move",
+      "control_risk": "tilt steers the knight one chess move; PAT single tap is B and starts fast rolling/confirms (a tap, not a hold); PAT double tap is A and opens pause; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 5,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_knightmove.py"
+    },
+    {
+      "id": "ardugo",
+      "title": "ArduGo",
+      "genre": "Board",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/ModusCreateOrg/ardugo",
+        "commit": "2343b903c36234c302efaaa5c3aca80010d388ee",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "38fb387fd633472f38f7a984c060b3a143ada1bf1a97aa00d183847d6390124a"
+      },
+      "namespace": "ArduGoSandbox",
+      "app_class": "ArduGoApp",
+      "menu_label": "ArduGo",
+      "control_risk": "tilt moves the 9x9 cursor; PAT single tap is A and places a black stone; PAT double tap is B and restarts; simple-rules Go only (no ko, pass, komi or resignation); PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); upstream global srand remains a retained low-priority review risk; product unchanged; watch hardware not tested",
+      "index": 6,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_ardugo.py"
+    },
+    {
+      "id": "minesweeper",
+      "title": "Minesweeper",
+      "genre": "Puzzle",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/Hexagenic/minesweeper-arduboy",
+        "commit": "1bd5e95a1d4ff20c510045b1d9d7c89218275ee8",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "a4a86b0af35557fcbf488728ba680a112507bc3aed4068970343eb853f7297f2"
+      },
+      "namespace": "MinesweeperSandbox",
+      "app_class": "MinesweeperApp",
+      "menu_label": "Minesweeper",
+      "control_risk": "tilt moves the 9x9 cursor; PAT single tap is A and reveals or restarts; PAT double tap is B and flags/removes a flag with a deliberate delay; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 7,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_minesweeper.py"
+    },
+    {
+      "id": "game2048",
+      "title": "2048",
+      "genre": "Puzzle",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/awisse/2048-Arduboy",
+        "commit": "038b34bf165f4fedee6d82f303651ce8e6eec7f2",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "0896878e9d52749a5e35a04429938755583d0ea6fdc57aedc2e12b133aeff5be"
+      },
+      "namespace": "Game2048Sandbox",
+      "app_class": "Game2048App",
+      "menu_label": "2048",
+      "control_risk": "tilt gives one move per press/release; PAT single tap is A and starts/new-games; PAT double tap is B and saves to the game-local RAM EEPROM; upstream hold-based A-save/B-reset are unavailable; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 8,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_game2048.py"
+    },
+    {
+      "id": "spacetanks",
+      "title": "Space Tanks",
+      "genre": "Action",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/joho/spacetanks",
+        "commit": "c4882b967aa10061f23ccc457261143f112b3e74",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "ae043525382a7294ac48838be781aa8de13057078645ddbdbe40b9448c734c28"
+      },
+      "namespace": "SpaceTanksSandbox",
+      "app_class": "SpaceTanksApp",
+      "menu_label": "Space Tanks",
+      "control_risk": "tilt moves the tank; PAT single tap is A and double tap B, both starting/firing with the original 30-frame cooldown; auto fire is ON by default only in the real playing state and the banner toggles it for the session; no hold required; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 9,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_spacetanks.py"
+    },
+    {
+      "id": "galaxion",
+      "title": "Galaxion",
+      "genre": "Shmups",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/tako2/galaxion",
+        "commit": "8cfbafdf57d0dae448c64f6576de788d8105bec8",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "6eb9546e9a883c9de3a1e46bfb01ad2f52f442c901741bbc405863ca063a0003"
+      },
+      "namespace": "GalaxionSandbox",
+      "app_class": "GalaxionApp",
+      "menu_label": "Galaxion",
+      "control_risk": "tilt moves the ship and the title cursor; PAT single tap is A and double tap B, both firing/starting/confirming; auto fire is ON by default only in GAME_ST_PLAY and the title AUTO row toggles it for the session; no hold required; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 10,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_galaxion.py"
+    },
+    {
+      "id": "stairssweep",
+      "title": "Stairssweep",
+      "genre": "Puzzle",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "stairssweep",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "namespace": "StairssweepSandbox",
+      "app_class": "StairssweepApp",
+      "menu_label": "Stairssweep",
+      "control_risk": "tilt uses the original rotated dpad; tilt-up plus PAT single-B rotates and cancels stars, with the rotate-axis step suppressed while B is held; PAT double tap is A and pauses/toggles sound; B chooses menu items; PAT hold exits; physical orientation not hardware-tested",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 11,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_stairssweep.py"
+    },
+    {
+      "id": "toyokumono",
+      "title": "Toyokumono",
+      "genre": "Action",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "toyokumono",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "namespace": "ToyokumonoSandbox",
+      "app_class": "ToyokumonoApp",
+      "menu_label": "Toyokumono",
+      "control_risk": "tilt moves continuously; PAT single tap is B and summons a cloud/selects/advances/retries; PAT double tap is A and pauses/opens menus/toggles sound/leaves; no core path needs a held A/B; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 12,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_toyokumono.py"
+    },
+    {
+      "id": "rysk",
+      "title": "RYSK",
+      "genre": "Action",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "rysk",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "namespace": "RyskSandbox",
+      "app_class": "RyskApp",
+      "menu_label": "RYSK",
+      "control_risk": "tilt moves the player; PAT single tap is A and double tap B, both starting/restarting the 60-second game; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 13,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_rysk.py"
+    },
+    {
+      "id": "reversi",
+      "title": "Reversi",
+      "genre": "Board",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "reversi",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "namespace": "ReversiSandbox",
+      "app_class": "ReversiApp",
+      "menu_label": "Reversi",
+      "control_risk": "tilt moves the board cursor and menus; PAT single tap is B and places/confirms/restores; PAT double tap is A and opens the menu or result actions; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 14,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_reversi.py"
+    },
+    {
+      "id": "quarto",
+      "title": "Quarto!",
+      "genre": "Board",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "quarto",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "namespace": "QuartoSandbox",
+      "app_class": "QuartoApp",
+      "menu_label": "Quarto!",
+      "control_risk": "tilt moves the cursor and browses offered pieces; PAT single tap is B and places/offers/confirms; PAT double tap is A and cancels or opens the menu/result actions; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 15,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_quarto.py"
+    },
+    {
+      "id": "asteroiddodge",
+      "title": "Asteroid Dodge",
+      "genre": "Action",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/james-b-collins/AsteroidDodge-Arduboy",
+        "commit": "830152255d35489b601c1461defa7d1b794ee17a",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "41aee8f24e1d127dde34e6fe72a0d4e06ef8b9e51408e0e70cf485fd866c6612"
+      },
+      "namespace": "AsteroidDodgeSandbox",
+      "app_class": "AsteroidDodgeApp",
+      "menu_label": "Asteroid Dodge",
+      "control_risk": "tilt moves the ship; PAT single tap is A and selects/confirms/continues; PAT double tap is B and has no in-play action; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 16,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_asteroiddodge.py"
+    },
+    {
+      "id": "memoryrhythm",
+      "title": "Memory Rhythm",
+      "genre": "Rhythm",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/tuxinator2009/Arduboy_MemoryRhythm",
+        "commit": "3cb80b5ce0ec6167522e8f3271eccff351a727b1",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE.txt",
+        "license_sha256": "43dd6c63c8a32dc1765cbe1815aeac0cf7996ba770bad024eefe833c1fd40876"
+      },
+      "namespace": "MemoryRhythmSandbox",
+      "app_class": "MemoryRhythmApp",
+      "menu_label": "Memory Rhythm",
+      "control_risk": "PAT single tap is A and double tap B; either starts and answers; tilt UP/DOWN/LEFT/RIGHT performs jump, duck and slide; sequence length and speed rise; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 17,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_memoryrhythm.py"
+    },
+    {
+      "id": "pong",
+      "title": "Pong",
+      "genre": "Sports",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/taylorhansen/Pong-Arduboy",
+        "commit": "ac2eb86d1ba9765124af7980be2d85bb608d2da6",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "cd5ccbc41eb0673f4e36df4351778e0d9b97749b31abf3964fbe5b0708b37f32",
+        "license_notices": [
+          {
+            "library": "Arduboy2",
+            "license": "BSD-3-Clause",
+            "license_path": "LICENSE-BSD-3-Arduboy2.txt",
+            "license_sha256": "5e977041c7d52c7001ace05ab0d78481cda13eb648995c311b303a05ebd73149",
+            "commit": "93c33f6ad61eea327dd38fee9289d586eaa42a65",
+            "note": "ball animation derives from Arduboy2's Bresenham implementation; the upstream BSD-3 text ships verbatim as a separate notice file"
+          }
+        ]
+      },
+      "namespace": "PongSandbox",
+      "app_class": "PongApp",
+      "menu_label": "Pong",
+      "control_risk": "single player: tilt UP/DOWN moves the left paddle, PAT single tap is A and starts/restarts, tilt LEFT pauses; two-player mode uses PAT double tap B as a secondary flow; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); ships the Arduboy2 BSD-3 notice text; watch hardware not tested",
+      "index": 18,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_pong.py"
+    },
+    {
+      "id": "jumpboy",
+      "title": "JumpBoy",
+      "genre": "Platformer",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/t-iwasaki/arduboy-JumpBoy",
+        "commit": "1b2dcc9c1e9929f8e02e372998c80e287f1aa3c3",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "984396ec8147737c9ef84e814ec6816cb17f4edcb760eb7fa1856b34477dece4"
+      },
+      "namespace": "JumpBoySandbox",
+      "app_class": "JumpBoyApp",
+      "menu_label": "JumpBoy",
+      "control_risk": "tilt left/right moves the ball (up/down stored but unused, as upstream); PAT single tap is A and double tap B, both starting; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); watch hardware not tested",
+      "index": 19,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_jumpboy.py"
+    },
+    {
+      "id": "longcat",
+      "title": "LongCat",
+      "genre": "Joke",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/jaguile6/arduboy-longcat",
+        "commit": "5894110c825f1c351c3f1055779b9b109f917cd3",
+        "path": "longcat",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "64571d2da850a26b4e92b0082ab2c571fe48468ed9c07109c4bb7f5d30081b8a"
+      },
+      "namespace": "LongCatSandbox",
+      "app_class": "LongCatApp",
+      "menu_label": "LongCat",
+      "control_risk": "tilt slides the cat until the next cell is blocked; PAT single tap is A and confirms/restarts; PAT double tap is B and opens the current menu; PAT hold exits",
+      "notes": "host tests PASS; real all-27 split build PASS (build/arduboy27-flash-migration-20261117/report.json); upstream NOTICE retained for attribution; watch hardware not tested",
+      "index": 20,
+      "status": "ported-host-verified",
+      "owner": "main",
+      "fit": "measured-linked",
+      "license_status": "verified",
+      "host_test": "tools/tests/test_arduboy30_longcat.py"
+    }
+  ],
+  "deferred_candidates": [
+    {
+      "id": "gosencho",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "gosencho",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "status": "candidate",
+      "reason": "pinned Obono candidate; no port, host test or licence file review was completed before the 21-game stop"
+    },
+    {
+      "id": "morse",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "morse",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "status": "candidate",
+      "reason": "pinned Obono candidate; no port, host test or licence file review was completed before the 21-game stop"
+    },
+    {
+      "id": "pi24k",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "pi24k",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "status": "candidate",
+      "reason": "pinned Obono candidate; no port, host test or licence file review was completed before the 21-game stop"
+    },
+    {
+      "id": "psicolo",
+      "source": {
+        "origin": "obono",
+        "repository": "https://github.com/obono/ArduboyWorks",
+        "commit": "d4b1f041789dcd1d71907654e4025d613b4ab420",
+        "path": "psicolo",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "62a5db2ff173434f94d055a9432f5655267e92f4db92a042b832884e8a48f6bb"
+      },
+      "status": "candidate",
+      "reason": "pinned Obono candidate; no port, host test or licence file review was completed before the 21-game stop"
+    },
+    {
+      "id": "evade",
+      "status": "incomplete-port",
+      "reason": "partial ModusCreate/evade-arduboy port on disk (no app.h or verified host test); MIT repo but assets still need per-file review; not eligible"
+    },
+    {
+      "id": "ardulo",
+      "status": "incomplete-port",
+      "reason": "incomplete port directory (licence only); no code, host test or verification; not eligible"
+    },
+    {
+      "id": "montana",
+      "status": "incomplete-port",
+      "reason": "incomplete port sources on disk; no host test or licence clearance; not eligible"
+    },
+    {
+      "id": "waternet",
+      "status": "incomplete-port",
+      "reason": "incomplete port sources on disk; licence not cleared; not eligible"
+    },
+    {
+      "id": "slidingtiles",
+      "status": "incomplete-port",
+      "reason": "incomplete port directory (licence files only); no code or host test; not eligible"
+    }
+  ],
+  "excluded_candidates": [
+    {
+      "id": "evade2",
+      "title": "EVADE 2",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/ModusCreateOrg/evade2",
+        "commit": "16f97ebdd71130f1afa02a58ff48469b1df185ba",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE.md",
+        "license_sha256": "6672457e20333e38eb9ad2dfef9f5acb4688801368835c8ad0e1087c682d8329"
+      },
+      "status": "pending-asset-review",
+      "reason": "external candidate not ported; a repository MIT file alone does not clear bundled assets or third-party libraries"
+    },
+    {
+      "id": "ard-drivin",
+      "title": "Ard Drivin",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/rveilleux/ard-drivin",
+        "commit": "78b6a0730878a622f3ca5b0c8fffd572507cd9b1",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE.txt",
+        "license_sha256": "207d5536e0da9ca1a194b6c9ff6f201943a79758aaf63b5458e41d75895f2931"
+      },
+      "status": "pending-asset-review",
+      "reason": "external candidate not ported; a repository MIT file alone does not clear bundled assets or third-party libraries"
+    },
+    {
+      "id": "mannbarschwein",
+      "title": "MannBarSchwein",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/PMunch/MannBarSchwein-arduboy",
+        "commit": "37bb8c2de4d22e9b9c45b3098035db638479c54e",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "3970411fe551dd234ed5fc03e49e3427d6b7e43dcf2465e96a9a2400c03ea0aa"
+      },
+      "status": "pending-asset-review",
+      "reason": "external candidate not ported; a repository MIT file alone does not clear bundled assets or third-party libraries"
+    },
+    {
+      "id": "late",
+      "title": "LATE",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/core1024/LATE",
+        "commit": "643440bf49257cf070cd54ab6e24e5e8122c7442",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "23797eb7db3e793ac163c28192b7140a0bef55271a8ff832703297a17308727d"
+      },
+      "status": "pending-asset-review",
+      "reason": "external candidate not ported; a repository MIT file alone does not clear bundled assets or third-party libraries"
+    },
+    {
+      "id": "shattered-lands",
+      "title": "Shattered Lands",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/tuxinator2009/ShatteredLands",
+        "commit": "2b67b479b4090e893d6864d7d4c604692fec0033",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "2cf5420ba07473b21780f83bb4ec3116c8d68db3a56aa5aee2d3d8a797b6c141"
+      },
+      "status": "pending-asset-review",
+      "reason": "external candidate not ported; a repository MIT file alone does not clear bundled assets or third-party libraries"
+    },
+    {
+      "id": "mystic-balloon",
+      "title": "Mystic Balloon",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/Gaveno/ID-34-Mystic-Balloon",
+        "commit": "a2ca9eee92016cf75ec1d6ea9f1126b2403549f5",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "bf375c1d749cec791293b0f91d4d505e1dc256c35b292897c7c785014cbdc18c"
+      },
+      "status": "pending-asset-review",
+      "reason": "external candidate not ported; a repository MIT file alone does not clear bundled assets or third-party libraries"
+    },
+    {
+      "id": "arduventure",
+      "title": "Arduventure",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/krperry/ID-46-Arduventure",
+        "commit": "a15adc31773259b99367483c6d23130969372e73",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "bf375c1d749cec791293b0f91d4d505e1dc256c35b292897c7c785014cbdc18c"
+      },
+      "status": "pending-asset-review",
+      "reason": "external candidate not ported; a repository MIT file alone does not clear bundled assets or third-party libraries"
+    },
+    {
+      "id": "star-honor",
+      "title": "Star Honor",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/wvillanueva/StarHonor",
+        "commit": "0d1dfbe6cf6c30c1acda67cf7e405dc0d93845d5",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "a42545c17ab51a6b6e43841fe5596bca5accf59b35b1214d3ea2a60ab7f5bffb"
+      },
+      "status": "pending-asset-review",
+      "reason": "external candidate not ported; a repository MIT file alone does not clear bundled assets or third-party libraries"
+    },
+    {
+      "id": "tiny-dungeon",
+      "title": "Tiny Dungeon",
+      "source": {
+        "origin": "extra",
+        "repository": "https://github.com/Lorandil/TinyDungeon",
+        "commit": "1f0f60e8447a4e2e11aa559e38feb3fa7fda2ecf",
+        "path": ".",
+        "license": "MIT",
+        "license_path": "LICENSE",
+        "license_sha256": "8f94ad24841b864d11e4e70998d044c5851c58e35ccc2454f8ffb9bbb1705b50"
+      },
+      "status": "pending-asset-review",
+      "reason": "external candidate not ported; a repository MIT file alone does not clear bundled assets or third-party libraries"
+    }
+  ],
+  "reserve": [
+    {
+      "id": "TeenyTank",
+      "reason": "local two-player-only design; single-watch play would not be honest",
+      "source": "https://github.com/Jezzamonn/TeenyTank"
+    },
+    {
+      "id": "phoboslab/arduboy-games",
+      "reason": "repository license is an OBONO-derived MIT notice; lineage overlaps the Obono source and needs per-game asset review"
+    }
+  ],
+  "verification": {
+    "host": [
+      "build/arduboy30-pilot-20261116/final21-independent-twenty-host.log",
+      "build/flash-migration-evidence-20261117/integrated-host.log"
+    ],
+    "combination": "final integrated host run 171 tests + 149 subtests PASS in 320.89 s (build/flash-migration-evidence-20261117/integrated-host-final.log); focused guard re-run 58 tests + 34 subtests PASS in 9.51 s; each catalogue port mounts/runs/unmounts against real geometry and 16-bit pgm macros in the all-27 source set; independent reviews used overlapping suites (do not sum)",
+    "embedded": "current authoritative real all-27 split build PASS (compile/link/extension/symbol/extract/fresh stock pack/strict range) in build/arduboy27-flash-migration-20261117/report.json; five resources moved byte-identically to .extflash, packed main 958,464 B with 40,960 B under the 999,424 B target; default6 and single-ardubullets separately PASS; still not a watch hardware trial",
+    "license": "every entry's local LICENSE was hashed with CRLF normalised to LF and matched its pinned upstream file"
+  },
+  "license_note": "source.path is the game directory inside the pinned repository; source.license_path is repository-relative (Obono keeps one MIT LICENSE at the root). license_sha256 is the LF-normalised digest of that pinned file. pong additionally ships the Arduboy2 BSD-3 notice for its Bresenham ball derivation. Ported status means host-verified; measured-linked means the combined image links, not that a watch has run it. Categories and built-in rows live only in the C++ registry, not in this 21-entry catalogue. No hardware acceptance is claimed."
+}

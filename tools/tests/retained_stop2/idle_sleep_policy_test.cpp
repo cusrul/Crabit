@@ -1,4 +1,4 @@
-#include "idle_sleep_policy.h"
+#include "power_policy.h"
 #include <cassert>
 #include <cstdio>
 int main() {

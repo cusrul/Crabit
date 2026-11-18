@@ -10,10 +10,22 @@ Create `nanoui-assets.json` beside your application project:
 {"app_dirs": ["App"], "output_dir": "Assets/generated"}
 ```
 
-Run `python /path/to/NanoUI/tools/font_builder.py --config /path/to/nanoui-assets.json`.
-Use `--check` to scan and pack without writing. `resource_gui.py` can create/select
-this configuration and open font generation or the original image/animation UI.
-`asset_builder.py --config ...` opens the image tool directly.
+Use the existing resource selector as the single entry point:
+
+```powershell
+python /path/to/NanoUI/tools/resource_gui.py --config /path/to/nanoui-assets.json check
+python /path/to/NanoUI/tools/resource_gui.py --config /path/to/nanoui-assets.json fonts
+python /path/to/NanoUI/tools/resource_gui.py --config /path/to/nanoui-assets.json images
+```
+
+`check` scans and packs fonts in memory without writing; `fonts` writes the
+generated fonts; `images` opens the original image/animation editor. Only GUI
+actions need Tkinter. With no action, the same entry opens the configuration
+selector, including a check button. No extra App manifest or UI directory is
+required. Keep dynamic text additions in the existing `extra_text` field.
+
+Existing `font_builder.py --config ... [--check]`, `asset_builder.py --config ...`
+and platform wrappers remain compatible.
 
 Paths resolve against the configuration, never the working directory. Generated
 `nanoui_assets.h`, `nanoui_assets.cpp` and `nanoui_font_provider.cpp` belong to
@@ -26,6 +38,10 @@ not a C++ parser: runtime text, translated strings or custom text helpers need
 `extra_text`, `sizes` or `text_helpers`. Default BDF heights are 8, 10, 12, 16,
 24; missing glyphs/sizes and STYLE_ART need an explicitly configured `ttf_font`.
 There is no implicit Windows font dependency or silent replacement font.
+Nested generated/build/examples/experimental/`.git`/`__pycache__`/backup directories are
+excluded from scanning (backup names contain `backup`, are `bak`, or end in
+`.bak`, case-insensitively). An explicitly configured scan root is still scanned,
+even if its name is `examples` or `build`; exclusions apply below that root.
 
 A BDF filename/height does not imply coverage of every character. In particular,
 the bundled `5x8.bdf` has no Chinese glyphs. The generator packs every scanned
@@ -77,6 +93,14 @@ files. This is not a crash-atomic multi-file transaction; keep resources in Git
 and regenerate after interrupted power/process execution. Do not run two
 generators against the same output concurrently. Unknown resource formats are
 rejected instead of silently overwritten.
+
+Keep product and example outputs separate. The BW16 examples configuration now
+writes to `build/font-examples-candidate`, not product `src`; this is an isolated
+candidate, not an automatically integrated example build. It does not seed the
+product media block: example integration must explicitly provide required media
+and build inputs. The known repository configurations have an output-separation
+test; the tool does not discover arbitrary competing configurations or lock
+concurrent writers. Font and media data still share the existing output format.
 
 The bundled BDF files are original font inputs, not merged generated subsets.
 See `../assets/fonts/SOURCES.md` for provenance and redistribution limitations.

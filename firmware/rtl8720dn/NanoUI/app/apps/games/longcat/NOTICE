@@ -1,0 +1,18 @@
+LongCat
+=======
+
+Upstream: https://github.com/jaguile6/arduboy-longcat
+Commit:   5894110c825f1c351c3f1055779b9b109f917cd3
+Path:     longcat/
+
+The root `LICENSE` is the upstream MIT text, unchanged. It names only
+"Copyright (c) 2016-2018 OBONO".
+
+Upstream credits the game to jaguile6 (repository owner) and Dreamer2345 (the
+in-game credits screen lists both). Those names are retained here as
+attribution for the actual game. This notice does not add a separate licence
+or expand the copyright holders named in the root MIT text; the work is
+distributed under the upstream repository's MIT terms.
+
+The `src/Images/*.png` files, `src/Images/Bitmaps.h`, `src/Map/maps.h` and the
+source tree are the upstream game resources at the pinned commit.

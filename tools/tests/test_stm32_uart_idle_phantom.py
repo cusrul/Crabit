@@ -14,11 +14,12 @@ class IdlePhantomTest(unittest.TestCase):
     def test_actual_callback_filters_empty_idle_but_preserves_data_and_tc(self):
         compiler = shutil.which("g++")
         self.assertIsNotNone(compiler)
-        port = (ROOT / "firmware/stm32/Core/Src/nanoui_port.cpp").read_text(encoding="utf-8")
-        callback = function(port, 'extern "C" void HAL_UARTEx_RxEventCallback(')
+        port = (ROOT / "firmware/stm32/Core/Src/uart_task.cpp").read_text(encoding="utf-8")
+        callback = function(port, 'void HAL_UARTEx_RxEventCallback(')
         parser = function(port, "for (uint16_t i = 0; i < total_len; i++)")
         fixture = r"""
 #include "crabit_wire.h"
+#include "topics.h"
 #include "companion_trace.h"
 #include <cassert>
 #include <vector>
@@ -59,7 +60,15 @@ namespace Crabit { namespace CompanionBle { bool hardwareActive() { return true;
 namespace CompanionTrace {
 void record(Event event, uint16_t, uint32_t, uint32_t) { if (event == RxEmptyIdle) ++filtered; }
 void message(const char*, const char*, uint16_t) {}
-} }
+}
+bool amebaSessionActive() { return true; }
+}
+namespace CrabitTone {
+bool handleFrame(const char*, size_t, uint16_t, bool, uint32_t) { return true; }
+}
+volatile bool g_coproc_active = false;
+uint32_t HAL_GetTick() { return 0; }
+bool UartOwner_Normal() { return true; }
 """
         fixture += (
             callback
@@ -68,6 +77,7 @@ unsigned trace_frames = 0, trace_bad_frames = 0, trace_ui_drops = 0;
 uint8_t rx_stitch_buf[CrabitWire::FRAME_SIZE] = {}, decoded[1024] = {};
 uint16_t stitch_idx = 0;
 struct EventBus { static bool enqueueMessage(const CrabitWire::Message&) { return true; } };
+struct LinkQueue { static bool enqueueUi(const CrabitWire::Message&) { return true; } };
 void feed(const uint8_t* raw_data, uint16_t total_len) {
 """
         )
@@ -127,6 +137,8 @@ int main() {
                     str(ROOT / "firmware/shared"),
                     "-I",
                     str(ROOT / "firmware/stm32/Core/Inc"),
+                    "-I",
+                    str(ROOT / "firmware/stm32/product/services/diagnostics"),
                     str(source),
                     "-o",
                     str(binary),
@@ -141,11 +153,12 @@ int main() {
         hal = (
             ROOT / "firmware/stm32/Drivers/STM32L4xx_HAL_Driver/Src/stm32l4xx_hal_uart.c"
         ).read_text(encoding="utf-8")
-        port = (ROOT / "firmware/stm32/Core/Src/nanoui_port.cpp").read_text(encoding="utf-8")
+        port = (ROOT / "firmware/stm32/Core/Src/uart_task.cpp").read_text(encoding="utf-8")
         branch = function(hal, "if (nb_remaining_rx_data == huart->RxXferSize)")
         parser = function(port, "for (uint16_t i = 0; i < total_len; i++)")
         fixture = r"""
 #include "crabit_wire.h"
+#include "topics.h"
 #include <cassert>
 #include <cstdio>
 #include "companion_trace.h"
@@ -171,8 +184,17 @@ uint8_t decoded[1024] = {};
 namespace Crabit { namespace CompanionTrace {
 void record(Event, uint16_t, uint32_t, uint32_t) {}
 void message(const char*, const char*, uint16_t) {}
-} }
+}
+bool amebaSessionActive() { return true; }
+}
+namespace CrabitTone {
+bool handleFrame(const char*, size_t, uint16_t, bool, uint32_t) { return true; }
+}
+volatile bool g_coproc_active = false;
+uint32_t HAL_GetTick() { return 0; }
+bool UartOwner_Normal() { return true; }
 struct EventBus { static bool enqueueMessage(const CrabitWire::Message&) { return true; } };
+struct LinkQueue { static bool enqueueUi(const CrabitWire::Message&) { return true; } };
 void feed(const uint8_t* raw_data, uint16_t total_len) {
 """
         )
@@ -217,6 +239,8 @@ int main() {
                     str(ROOT / "firmware/shared"),
                     "-I",
                     str(ROOT / "firmware/stm32/Core/Inc"),
+                    "-I",
+                    str(ROOT / "firmware/stm32/product/services/diagnostics"),
                     str(source),
                     "-o",
                     str(binary),

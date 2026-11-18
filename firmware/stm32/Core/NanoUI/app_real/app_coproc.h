@@ -2,8 +2,12 @@
 #define APP_COPROC_H
 
 #include "NanoUI/NanoUI.h"
-#include "usart.h" 
-#include "spi.h"   
+#include "NanoUI/core/sensor_types.h"
+#include "sensor_snapshot.h"
+#include "topics.h"
+#include "comms_link.h"
+#include "display.h"
+#include "uart_task.h"
 #include <string.h>
 #include <stdio.h> 
 #include "FreeRTOS.h"
@@ -11,16 +15,10 @@
 #include "global_store.h" 
 #include "event_bus.h" 
 #include "axp2101.h"
-#include "i2c.h"
+#include "bw16_voltage_config.h"
 
-extern "C" void OLED_Init(void);
-extern void OLED_SetSleep(bool sleep); 
-extern "C" void OLED_WR_Byte(uint8_t dat, uint8_t cmd);
 extern volatile bool g_coproc_active; 
-extern SPI_HandleTypeDef hspi3; 
 
-extern volatile uint32_t dbg_rx_evts;
-extern volatile uint32_t dbg_rx_errs;
 
 inline void BW16_SetPower(bool enable) {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -41,12 +39,14 @@ inline void BW16_SetBusConnect(bool connect) {
 }
 
 inline void BW16_EnablePowerDomain() {
-    AXP2101_SetDC3Voltage(&hi2c1, 3100);
-    AXP2101_SetDC3Enable(&hi2c1, true);
+    // Only the saved 3.0/3.1/3.2 V target reaches the PMU; the boot order,
+    // delays and enable call remain exactly as before.
+    AXP2101_SetDC3Voltage(Crabit::Bw16Voltage::targetMv());
+    AXP2101_SetDC3Enable(true);
 }
 
 inline void BW16_DisablePowerDomain() {
-    AXP2101_SetDC3Enable(&hi2c1, false);
+    AXP2101_SetDC3Enable(false);
 }
 
 inline void BW16_PrimeBootState() {
@@ -76,41 +76,8 @@ inline void BW16_NormalBoot() {
     BW16_SetPower(false);  
     BW16_EnablePowerDomain();
     vTaskDelay(pdMS_TO_TICKS(150));        
-    MX_USART1_UART_Init(); 
+    Uart::configure(); 
     BW16_SetPower(true);   
-}
-
-inline void Safe_SPI_Release() {
-    HAL_SPI_DeInit(&hspi3);
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    GPIO_InitStruct.Pin = GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5;
-    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG; 
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-    GPIO_InitStruct.Pin = GPIO_PIN_15;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-}
-
-inline void Safe_SPI_Claim() {
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    GPIO_InitStruct.Pin = GPIO_PIN_3 | GPIO_PIN_5;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF6_SPI3;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = GPIO_PIN_4;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-    
-    GPIO_InitStruct.Pin = GPIO_PIN_15;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-    
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
 }
 
 class CoprocTerminalApp : public Application {
@@ -170,13 +137,13 @@ public:
                     canvas->drawText(10, 28, "3. HANDING OVER!", 1); canvas->display(); 
                     vTaskDelay(pdMS_TO_TICKS(150)); 
                     canvas->clear(); canvas->display(); 
-                    Safe_SPI_Release(); 
+                    Display::releaseBus(); 
                     g_coproc_active = true; 
                 } else {
                     canvas->drawText(10, 28, "3. MODE ACTIVE!", 1); canvas->display(); 
                 }
 
-                EventBus::publish("sys/mode", mode_command); 
+                CrabitLink::send(Topics::SysMode, mode_command); 
                 vTaskDelay(pdMS_TO_TICKS(150)); 
                 state = 3; 
             }
@@ -184,13 +151,13 @@ public:
                 UIEvent e = input->poll();
                 if (e.type != EVT_NONE) {
                     if (is_ui_mode) { 
-                        if (e.type == EVT_UP) EventBus::publish("sys/btn", "UP");
-                        else if (e.type == EVT_DOWN) EventBus::publish("sys/btn", "DOWN");
-                        else if (e.type == EVT_OK) EventBus::publish("sys/btn", "OK");
+                        if (e.type == EVT_UP) CrabitLink::send(Topics::SysBtn, "UP");
+                        else if (e.type == EVT_DOWN) CrabitLink::send(Topics::SysBtn, "DOWN");
+                        else if (e.type == EVT_OK) CrabitLink::send(Topics::SysBtn, "OK");
                     }
                     
                     if (e.type == EVT_BACK) {
-                        if (is_ui_mode) EventBus::publish("sys/btn", "BACK");
+                        if (is_ui_mode) CrabitLink::send(Topics::SysBtn, "BACK");
                         
                         uint32_t now = HAL_GetTick();
                         if (now - last_back_press < 600) { 
@@ -215,7 +182,7 @@ public:
                     
                     char val_buf[64]; 
                     snprintf(val_buf, sizeof(val_buf), "%d,%d,%d|%d,%d,%d|%d", (int)(ax*100), (int)(ay*100), (int)(az*100), dx, dy, lift, bat);
-                    EventBus::publish("sys/sns", val_buf);
+                    CrabitLink::send(Topics::SysSns, val_buf);
                 }
 
                 if (!is_ui_mode) {
@@ -227,7 +194,7 @@ public:
                     canvas->drawText(8, 10, title_buf, 1);
                     
                     char stat_buf[32];
-                    snprintf(stat_buf, sizeof(stat_buf), "R:%lu E:%lu", dbg_rx_evts, dbg_rx_errs);
+                    snprintf(stat_buf, sizeof(stat_buf), "R:%lu E:%lu", Uart::rxEvents(), Uart::rxErrors());
                     canvas->drawText(10, 26, stat_buf, 1);
 
                     canvas->drawText(10, 36, bleStatusLabel(), 1);
@@ -243,11 +210,10 @@ public:
             }
             else if (state == 5) {
                 if (is_ui_mode) {
-                    Safe_SPI_Claim(); 
-                    HAL_SPI_DeInit(&hspi3); vTaskDelay(pdMS_TO_TICKS(5)); HAL_SPI_Init(&hspi3);
-                    OLED_Init(); 
-                    OLED_SetSleep(false); 
-                    vTaskDelay(pdMS_TO_TICKS(50)); 
+                    Display::beginClaim();
+                    vTaskDelay(pdMS_TO_TICKS(5));
+                    Display::finishClaim();
+                    vTaskDelay(pdMS_TO_TICKS(50));
                     g_coproc_active = false; 
                 }
 

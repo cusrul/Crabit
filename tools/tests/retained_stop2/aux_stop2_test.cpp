@@ -1,4 +1,4 @@
-#include "aux_stop2.h"
+#include "power_policy.h"
 #include <cassert>
 #include <cstdio>
 #include <initializer_list>

@@ -27,11 +27,13 @@ class ProbeTest(unittest.TestCase):
     def test_product_default_and_explicit_probe_build(self):
         compiler = shutil.which("g++")
         self.assertIsNotNone(compiler)
-        service = (ROOT / "firmware/stm32/Core/Src/companion_ble.cpp").read_text(encoding="utf-8")
-        port = (ROOT / "firmware/stm32/Core/Src/nanoui_port.cpp").read_text(encoding="utf-8")
+        service = (
+            ROOT / "firmware/stm32/product/features/companion/companion_ble.cpp"
+        ).read_text(encoding="utf-8")
+        port = (ROOT / "firmware/stm32/product/board/board.cpp").read_text(encoding="utf-8")
         self.assertIn("sys_cfg.enable_ble && Crabit::CompanionBle::legacyAutostartAllowed()", port)
         self.assertIn(
-            "EventBus::tryPublish(CompanionProbe::topic(), CompanionProbe::value(), state.session)",
+            "CrabitLink::send(CompanionProbe::topic(), CompanionProbe::value(), state.session)",
             service,
         )
         receive = function(service, "void receive(")

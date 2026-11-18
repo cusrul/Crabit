@@ -1,6 +1,6 @@
 {
   "app_dirs": ["src", "app", "app_example"],
-  "output_dir": "src",
+  "output_dir": "../../../build/font-examples-candidate",
   "fonts_dir": "assets/fonts/bdf",
   "ttf_font": "C:/Windows/Fonts/simhei.ttf",
   "scan_mode": "all",

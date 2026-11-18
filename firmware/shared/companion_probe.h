@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include "topics.h"
 
 // Explicit diagnostic build only; ordinary builds retain the product route.
 #ifndef CRABIT_COMPANION_UART_PROBE_ONLY
@@ -14,7 +15,7 @@
 namespace Crabit { namespace CompanionProbe {
 constexpr bool Enabled = CRABIT_COMPANION_UART_PROBE_ONLY != 0;
 constexpr bool SkipLegacyAutostart = Enabled || CRABIT_COMPANION_SKIP_LEGACY_AUTOSTART != 0;
-inline const char* topic() { return Enabled ? "sys/bw/ping" : "sys/comm"; }
+inline const char* topic() { return Enabled ? Topics::SysBwPing : Topics::SysComm; }
 inline const char* value() { return Enabled ? "PING" : "START"; }
 inline bool isPong(const char* value) { return value && strcmp(value, "BW16 PONG OK!") == 0; }
 struct ByteSummary { uint16_t size, zero, ff, printable; };

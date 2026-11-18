@@ -1,3 +1,4 @@
+#include "topics.h"
 #ifndef CRABIT_AUDIT_CONTRACT_H
 #define CRABIT_AUDIT_CONTRACT_H
 
@@ -9,9 +10,9 @@ namespace CrabitAudit {
 constexpr size_t MaxRecord = 768;
 constexpr size_t ChunkBytes = 64;
 constexpr size_t Capacity = 2;
-constexpr const char* PutTopic = "audit/put";
-constexpr const char* ReadTopic = "audit/read";
-constexpr const char* AckTopic = "audit/ack";
+constexpr const char* PutTopic = Topics::AuditPut;
+constexpr const char* ReadTopic = Topics::AuditRead;
+constexpr const char* AckTopic = Topics::AuditAck;
 
 inline bool number(const char*& p, uint32_t& result, char delimiter) {
     result = 0;

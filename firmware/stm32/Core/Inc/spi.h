@@ -42,9 +42,6 @@ void MX_SPI3_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
-void SPI_ReleaseBus(void);
-void SPI_ClaimBus(void);
-
 
 /* USER CODE END Prototypes */
 

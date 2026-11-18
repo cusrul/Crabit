@@ -28,9 +28,9 @@ public:
 
     void onTick() override {
         StmSensorSnapshot snapshot{};
-        if (!STM32_GetUiSensorSnapshot(snapshot)) return;
+        const bool available = STM32_GetUiSensorSnapshot(snapshot);
         const auto* data = &snapshot.power;
-        if (!data->is_valid) {
+        if (!available || !data->is_valid) {
             SetSensorText(str_batt, sizeof(str_batt), "N/A");
             SetSensorText(str_power, sizeof(str_power), "N/A");
             SetSensorText(str_temp, sizeof(str_temp), "N/A");
@@ -39,19 +39,22 @@ public:
         }
 
         char buf[32];
-        if (data->voltage > 0.5f) {
+        char pct[8] = "--%";
+        if (data->percent >= 0 && data->percent <= 100)
+            snprintf(pct, sizeof(pct), "%d%%", data->percent);
+        if (data->voltage_valid && data->voltage > 0.5f) {
             char vbuf[16];
             FormatFixed2(vbuf, sizeof(vbuf), data->voltage, "V");
-            if (data->percent > 0) snprintf(buf, sizeof(buf), "%s %d%%", vbuf, data->percent);
-            else snprintf(buf, sizeof(buf), "%s", vbuf);
+            snprintf(buf, sizeof(buf), "%s %s", vbuf, pct);
             SetSensorText(str_batt, sizeof(str_batt), buf);
         } else {
-            SetSensorText(str_batt, sizeof(str_batt), "N/A");
+            SetSensorText(str_batt, sizeof(str_batt), pct);
         }
 
-        const char* power_state = "BAT";
-        if (data->is_charging && data->is_vbus_in) power_state = "CHG/VBUS";
-        else if (data->is_charging) power_state = "CHG";
+        const bool charging = data->charging_valid && data->is_charging;
+        const char* power_state = data->charging_valid ? "BAT" : "N/A";
+        if (charging && data->is_vbus_in) power_state = "CHG/VBUS";
+        else if (charging) power_state = "CHG";
         else if (data->is_vbus_in) power_state = "VBUS";
         SetSensorText(str_power, sizeof(str_power), power_state);
 

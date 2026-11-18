@@ -107,7 +107,7 @@ class RadarReadableUiTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.source = (preview.BW / "app/app_mac_radar.h").read_text(encoding="utf-8")
+        cls.source = (preview.BW / "app/apps/wireless/app_mac_radar.h").read_text(encoding="utf-8")
         cls.generated = extracted_driver(cls.source)
 
     def test_chinese_literals_have_existing_12px_product_glyphs(self):

@@ -1,13 +1,14 @@
 #pragma once
 
 #include "crabit_wire.h"
+#include "topics.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
 namespace CrabitPreferences {
-constexpr const char* READ_TOPIC = "sys/prefs";
-constexpr const char* SET_TOPIC = "sys/prefs/set";
+inline constexpr const char* READ_TOPIC = Topics::SysPrefs;
+inline constexpr const char* SET_TOPIC = Topics::SysPrefsSet;
 enum Flag : uint8_t { Pat = 1, Qmi = 2, Sound = 4, Led = 8 };
 
 // An optional trailer AFTER the unmodified 48-byte legacy config. Old firmware

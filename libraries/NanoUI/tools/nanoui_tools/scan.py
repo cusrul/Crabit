@@ -17,6 +17,16 @@ SIZE_PATTERNS = [
     re.compile(r"drawTextInRect\s*\([^,;()]+,[^,;()]+,[^,;()]+,[^,;()]+,[^,;()]+,\s*(\d+)\)"),
     re.compile(r"drawText\s*\([^,;()]+,[^,;()]+,[^,;()]+,\s*(\d+)"),
 ]
+# Parts are relative to the configured root, so an explicitly selected
+# examples/ or build/ directory still scans. Nested generation, backup and
+# example trees stay out of product/app font collection.
+EXCLUDED_PARTS = {"experimental", "generated", "build", ".git", "__pycache__", "examples"}
+
+
+def excluded_part(part):
+    """True for a directory name holding generated, backup or example data."""
+    name = part.lower()
+    return name in EXCLUDED_PARTS or name == "bak" or "backup" in name or name.endswith(".bak")
 
 
 def unescape(text):
@@ -42,11 +52,7 @@ def scan_project(dirs, mode="visible", extra_text=(), extra_sizes=(), excluded=(
             real = path.resolve()
             if real in visited or real in excluded:
                 continue
-            if any(
-                part in ("experimental", "generated", "build", ".git", "__pycache__")
-                or "Backup" in part
-                for part in path.relative_to(directory).parts
-            ):
+            if any(excluded_part(part) for part in path.relative_to(directory).parts[:-1]):
                 continue
             visited.add(real)
             try:

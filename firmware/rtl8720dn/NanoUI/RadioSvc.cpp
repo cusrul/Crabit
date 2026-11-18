@@ -1,4 +1,6 @@
 #include "RadioSvc.h"
+#include "topics.h"
+#include "comms_link.h"
 
 #include <FreeRTOS.h>
 #include <queue.h>
@@ -302,14 +304,14 @@ bool radioCheckpoint(RadioTraceStage stage, uint16_t request_id, uint32_t genera
         enqueueRadioTrace(stage, request_id);
         return true;
     }
-    if (!Protocol::send_message_checked("diag/radio", radioTraceText(stage), request_id)) return false;
+    if (!CrabitLink::send(Topics::DiagRadio, radioTraceText(stage), request_id)) return false;
     // LOGUART flush is a no-op. This is driver acceptance, not a remote ACK.
     return generationIsCurrent(generation) && g_state == RadioSvc::STARTING &&
         (int32_t)(millis() - g_start_deadline_ms) < 0;
 }
 
 void serviceRadioTrace(const RadioTraceEvent& trace) {
-    Protocol::send_message("diag/radio", radioTraceText(trace.stage), trace.request_id);
+    CrabitLink::send(Topics::DiagRadio, radioTraceText(trace.stage), trace.request_id);
 }
 
 void clearConnectionState(bool reset_write_queue = true) {
@@ -845,7 +847,7 @@ void processStop(const RadioCommand& command);
 void attachDiagnostic(const char* stage, uint16_t request_id) {
 #if CRABIT_BW16_DIAG_ATTACH_TRACE
     // Called only from the existing Arduino writer, never the UART worker.
-    Protocol::send_message("diag/radio", stage, request_id);
+    CrabitLink::send(Topics::DiagRadio, stage, request_id);
 #else
     (void)stage; (void)request_id;
 #endif
@@ -1208,14 +1210,19 @@ void flushUartEvents() {
     while (xQueueReceive(g_uart_queue, &event, 0) == pdTRUE) {
         event.payload[event.length < sizeof(event.payload) ? event.length : sizeof(event.payload) - 1] = '\0';
         if (event.kind == UART_STATUS) {
-            Protocol::send_message("sys/ble", event.payload, event.request_id);
+            CrabitLink::send(Topics::SysBle, event.payload, event.request_id);
         } else if (event.kind == UART_COMPANION_STATUS) {
             const bool attach_reply = strcmp(event.payload, "ATTACHED") == 0;
             if (attach_reply) attachDiagnostic("ATTACH_REPLY_BEGIN", event.request_id);
-            const bool sent = Protocol::send_message_checked("sys/comm", event.payload, event.request_id);
+            const bool sent = CrabitLink::send(Topics::SysComm, event.payload, event.request_id);
             if (attach_reply) attachDiagnostic(sent ? "ATTACH_REPLY_SENT" : "ATTACH_REPLY_FAIL", event.request_id);
         } else if (event.kind == UART_FORWARD) {
-            Protocol::send_to_stm32(event.payload);
+            char topic[CrabitWire::MAX_TOPIC + 1];
+            char value[CrabitWire::MAX_VALUE + 1];
+            uint16_t request_id = 0;
+            if (Protocol::decode_command_json(event.payload, topic, sizeof(topic),
+                                              value, sizeof(value), &request_id))
+                CrabitLink::send(topic, value, request_id);
         }
     }
     RadioTraceEvent trace{};
@@ -1227,7 +1234,7 @@ void flushUartEvents() {
     const bool overflow = g_trace_overflow;
     g_trace_overflow = false;
     taskEXIT_CRITICAL();
-    if (overflow) Protocol::send_message("diag/radio", "TRACE_DROPPED", 0);
+    if (overflow) CrabitLink::send(Topics::DiagRadio, "TRACE_DROPPED", 0);
 }
 
 void service() {

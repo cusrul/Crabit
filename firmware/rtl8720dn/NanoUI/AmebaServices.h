@@ -2,6 +2,8 @@
 #define AMEBA_SERVICES_H
 
 #include "AmebaEventBus.h"
+#include "topics.h"
+#include "comms_link.h"
 #include "AmebaStore.h"
 #include "NetManager.h"
 #include "Protocol.h"
@@ -15,7 +17,7 @@
 extern volatile BW16Mode current_mode;
 extern volatile bool is_display_active;
 extern void releaseOledBus();
-extern void start_ui_mode();
+extern bool start_ui_mode();
 
 class AmebaServices {
 private:
@@ -60,13 +62,13 @@ private:
         // retain their existing network controls inside the selected UI mode.
         if (RadioSvc::companionControlsMode() || current_mode == MODE_BLE ||
                 current_mode == MODE_SLEEP) {
-            Protocol::send_message("sys/ack", "REJECTED");
+            CrabitLink::send(Topics::SysAck, "REJECTED");
             return;
         }
         String v_str = value ? value : "";
         if (v_str == "wifi_off") {
             if (current_mode == MODE_WIFI || current_mode == MODE_UI) NetManager::setWiFi(false);
-            else Protocol::send_message("sys/ack", "REJECTED");
+            else CrabitLink::send(Topics::SysAck, "REJECTED");
         }
         else if (v_str.startsWith("wifi_on")) {
             int c1 = v_str.indexOf(','); int c2 = v_str.indexOf(',', c1 + 1);
@@ -79,7 +81,13 @@ private:
 
     static void applyMode(const char* value, uint16_t request_id = 0) {
         if (RadioSvc::companionControlsMode()) {
-            Protocol::send_message("sys/ack", "REJECTED");
+            // Preserve the legacy uncorrelated rejection for BLE/WIFI, but let a
+            // new STM32 correlate an immediate UI rejection instead of waiting
+            // for its bounded timeout.
+            const bool correlated_ui = request_id != 0 && value != nullptr &&
+                strcmp(value, "UI") == 0;
+            CrabitLink::send(Topics::SysAck, "REJECTED",
+                             correlated_ui ? request_id : 0);
             return;
         }
         String v_str = value ? value : "";
@@ -89,37 +97,51 @@ private:
             RadioSvc::Result result = NetManager::initBLE(request_id);
             if (result == RadioSvc::QUEUED) {
                 current_mode = MODE_BLE;
-                Protocol::send_message("sys/ack", "QUEUED");
+                CrabitLink::send(Topics::SysAck, "QUEUED");
             } else if (result == RadioSvc::BUSY) {
-                Protocol::send_message("sys/ack", "BUSY");
+                CrabitLink::send(Topics::SysAck, "BUSY");
             } else {
-                Protocol::send_message("sys/ack", "REJECTED");
+                CrabitLink::send(Topics::SysAck, "REJECTED");
             }
         } else if (v_str == "WIFI" && current_mode == MODE_WAITING) {
-            current_mode = MODE_WIFI; Protocol::send_message("sys/ack", "WIFI_OK");
+            current_mode = MODE_WIFI; CrabitLink::send(Topics::SysAck, "WIFI_OK");
 #if CRABIT_BW16_ENABLE_NETWORK_SYNC
-            if (request_id) Protocol::send_message("net/status", "WIFI_MODE", request_id);
+            if (request_id) CrabitLink::send(Topics::NetStatus, "WIFI_MODE", request_id);
 #endif
-        } else if (v_str == "UI" && current_mode == MODE_WAITING) {
-            current_mode = MODE_UI; start_ui_mode();
+        } else if (v_str == "UI") {
+            if (current_mode != MODE_WAITING) {
+                // Legacy callers (request_id == 0) keep the old silent ignore.
+                if (request_id) CrabitLink::send(Topics::SysAck, "REJECTED", request_id);
+                return;
+            }
+            current_mode = MODE_UI;
+            const bool ready = start_ui_mode();
+            // Only a non-zero request id is answered; request_id == 0 is the
+            // unchanged legacy path used by older STM32 firmware.
+            if (request_id)
+                CrabitLink::send(Topics::SysAck, ready ? "UI_READY" : "UI_FAILED", request_id);
         } else if (v_str == "OTA" && current_mode == MODE_WAITING) {
 #if CRABIT_BW16_ENABLE_OTA
-            current_mode = MODE_OTA; Protocol::send_message("sys/ack", "OTA_OK");
+            current_mode = MODE_OTA; CrabitLink::send(Topics::SysAck, "OTA_OK");
 #else
-            Protocol::send_message("sys/notify", "OTA_UNAVAILABLE");
+            CrabitLink::send(Topics::SysNotify, "OTA_UNAVAILABLE");
 #endif
         } else if (v_str == "EXIT" && current_mode != MODE_WAITING && current_mode != MODE_SLEEP) {
             if (is_display_active) {
+                // Tear down every UI app while the panel and SPI bus are still
+                // owned: onUnmount() may draw, and exitCurrentApp() cannot pop
+                // the root launcher. Release the bus afterwards, notify last.
+                AppManager::shutdown();
                 is_display_active = false;
                 releaseOledBus();
-                Protocol::send_message("sys/notify", "BW16_EXIT");
-                AppManager::exitCurrentApp();
+                if (request_id) CrabitLink::send(Topics::SysAck, "UI_EXIT", request_id);
+                else CrabitLink::send(Topics::SysNotify, "BW16_EXIT");
             }
             if (ble_was_connected || current_mode == MODE_BLE) NetManager::stopBLE();
             WiFi.disconnect();
             current_mode = MODE_SLEEP;
         } else {
-            Protocol::send_message("sys/ack", "REJECTED");
+            CrabitLink::send(Topics::SysAck, "REJECTED");
         }
     }
 
@@ -154,7 +176,9 @@ private:
 
 public:
     static bool enqueueMode(const CrabitWire::Message& message) {
-        if (!message.request_id || (strcmp(message.value, "BLE") != 0 && strcmp(message.value, "WIFI") != 0)) return false;
+        if (!message.request_id || (strcmp(message.value, "BLE") != 0 &&
+                                    strcmp(message.value, "WIFI") != 0 &&
+                                    strcmp(message.value, "UI") != 0)) return false;
         return enqueue(2, message.value, message.request_id);
     }
 
@@ -205,7 +229,7 @@ public:
 #endif
         
         // 1. 核心高频流：解析并维护数据结构
-        AmebaEventBus::subscribe("sns/all", [](const char* v) {
+        AmebaEventBus::subscribe(Topics::SnsAll, [](const char* v) {
             if (!v || !sensor_queue) return;
             PendingSensors sensors{};
             if (sscanf(v, "%d,%d,%d|%d,%d,%d|%d|%d|%d|%d",
@@ -218,17 +242,17 @@ public:
         });
 
         // 2. 网络控制指令
-        AmebaEventBus::subscribe("sys/net", [](const char* value) {
+        AmebaEventBus::subscribe(Topics::SysNet, [](const char* value) {
             enqueue(1, value);
         });
 
         // 3. 模式切换指令
-        AmebaEventBus::subscribe("sys/mode", [](const char* value) {
+        AmebaEventBus::subscribe(Topics::SysMode, [](const char* value) {
             enqueue(2, value);
         });
 
         // 4. PING
-        AmebaEventBus::subscribe("sys/bw/ping", [](const char*) {
+        AmebaEventBus::subscribe(Topics::SysBwPing, [](const char*) {
             enqueue(3, "");
         });
     }
@@ -268,7 +292,7 @@ public:
             if (ble_was_connected) {
                 RadioSvc::Result result =
                     NetManager::safe_ble_notify(String(json), NetManager::active_conn_id);
-                if (result == RadioSvc::REJECTED) Protocol::send_message("sys/ble", "REJECTED");
+                if (result == RadioSvc::REJECTED) CrabitLink::send(Topics::SysBle, "REJECTED");
             }
         }
         PendingCommand command{};
@@ -280,9 +304,9 @@ public:
                     const RadioSvc::Snapshot radio = RadioSvc::snapshot();
                     const bool ready = current_mode == MODE_BLE && radio.ram_pairing_only &&
                         (radio.state == RadioSvc::ADVERTISING || radio.state == RadioSvc::CONNECTED);
-                    Protocol::send_message("sys/comm", ready ? "UART_OK" : "UART_NOT_READY",
+                    CrabitLink::send(Topics::SysComm, ready ? "UART_OK" : "UART_NOT_READY",
                                            command.request_id);
-                } else Protocol::send_message("sys/notify", "BW16 PONG OK!");
+                } else CrabitLink::send(Topics::SysNotify, "BW16 PONG OK!");
             } else if (command.kind == 4) {
                 char action[24] = {};
                 uint32_t sequence = 0;

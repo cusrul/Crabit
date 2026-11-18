@@ -137,8 +137,8 @@ class PhoneWeatherHostTests(unittest.TestCase):
         for original, target in (
             (ROOT / "firmware/shared/weather_contract.h", shared / "weather_contract.h"),
             (ROOT / "firmware/shared/crabit_wire.h", shared / "crabit_wire.h"),
-            (ROOT / "firmware/stm32/Core/Inc/network_weather.h", inc / "network_weather.h"),
-            (ROOT / "firmware/stm32/Core/Src/network_weather.cpp", src / "network_weather.cpp"),
+            (ROOT / "firmware/stm32/product/features/network/network_weather.h", inc / "network_weather.h"),
+            (ROOT / "firmware/stm32/product/features/network/network_weather.cpp", src / "network_weather.cpp"),
         ):
             shutil.copyfile(original, target)
             if original.read_bytes() != target.read_bytes():
@@ -173,6 +173,8 @@ class PhoneWeatherHostTests(unittest.TestCase):
                 "-std=c++17",
                 "-I",
                 str(inc),
+                "-I",
+                str(shared),
                 str(src / "network_weather.cpp"),
                 str(driver_path),
                 "-o",

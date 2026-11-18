@@ -1,0 +1,11 @@
+{
+  "$comment": "Single shared-header staging manifest for both BW16 sketch entry points (tools/build-rtl8720dn.ps1 and tools/build_bw16_split_games.py). firmware/shared/<name> is the source of truth; firmware/rtl8720dn/NanoUI/src/crabit_shared/<name> is the in-tree sketch target that the staged copy overwrites. Only list headers that already exist in both trees. Header names must stay plain file names (no absolute paths, no '..'), and the roots below are validated by both entry points.",
+  "source_root": "firmware/shared",
+  "staged_root": "src/crabit_shared",
+  "headers": [
+    "command_router.h",
+    "comms_link.h",
+    "topics.h",
+    "weather_contract.h"
+  ]
+}

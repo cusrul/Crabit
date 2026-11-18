@@ -46,10 +46,10 @@ class InputFeedbackTests(unittest.TestCase):
     def test_expiry_tick_precedes_screen_active_gate_in_ui_loop(self):
         source = (ROOT / "firmware/stm32/Core/Src/nanoui_port.cpp").read_text(encoding="utf-8")
         loop_start = source.index(
-            "while(1) {", source.index('extern "C" void NanoUI_MainLoop(void)')
+            "while(1) {", source.index("void NanoUI_MainLoop(void)")
         )
         loop = source[loop_start:]
-        diag_tick = loop.index("CrabitUsb_DiagTick();")
+        diag_tick = loop.index("Usb::diagTick();")
         feedback_tick = loop.index("InputFeedback::tick();")
         active_gate = loop.index("if (SysPower::isActive())")
 

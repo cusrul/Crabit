@@ -37,7 +37,7 @@ FirstApp 的源码入口是 `src/apps/hello_app.h`，生成文件位于 `src/gen
 }
 ```
 
-4. 将App里Hello改为“你好”，保存，先运行下节的 `--check` 命令。应无缺字错误，再运行不带check的生成命令。
+4. 将App里Hello改为“你好”，保存，先运行下节的 `check` 命令。应无缺字错误，再运行 `fonts` 生成命令。
 5. 关闭示例窗口，重新编译、运行。应看到中文替代Hello；再运行第一课的ctest命令，应仍然通过。没看到时依次核对保存、扫描路径、生成结果和运行的exe，不覆盖整个框架。
 
 为什么配置里还保留“示例”？原资源测试会核对“示”字，改标题后这个字可能从App中消失，而默认扫描目录不包括测试。extra_text显式保留测试所需文字。若ctest因此失败，应保留必要测试资源，不删除测试或改成无条件通过。
@@ -46,25 +46,25 @@ FirstApp 的源码入口是 `src/apps/hello_app.h`，生成文件位于 `src/gen
 
 ## 工具和命令
 
-工具实现在 `libraries/NanoUI/tools/`：`font_builder.py` 检查并生成字体资源；`asset_builder.py` 打开图片/动画编辑器；`resource_gui.py` 提供配置选择和工具入口。命令从仓库根目录运行：
+统一入口是 `libraries/NanoUI/tools/resource_gui.py`：`check` 检查字体，`fonts` 生成字体，`images` 打开图片/动画编辑器，不加动作则打开配置选择器。旧 `font_builder.py` / `asset_builder.py` 仍兼容。命令从仓库根目录运行：
 
 ```powershell
 python -m pip install -r libraries/NanoUI/tools/requirements.txt
-python libraries/NanoUI/tools/font_builder.py --config libraries/NanoUI/examples/FirstApp/nanoui-assets.json --check
+python libraries/NanoUI/tools/resource_gui.py --config libraries/NanoUI/examples/FirstApp/nanoui-assets.json check
 ```
 
 依赖文件安装 Pillow（Python 3.10+）。Tkinter 只用于图形界面；视频导入才额外需要 `opencv-python`。这些都不是普通 C++ 编译依赖。
 
-`--check` 会扫描并在内存中打包，不写生成文件。确认字符和字号覆盖后，如确实要更新 FirstApp 的资源，再在可写的工作副本中运行：
+`check` 会扫描并在内存中打包，不写生成文件。确认字符和字号覆盖后，如确实要更新 FirstApp 的资源，再在可写的工作副本中运行：
 
 ```powershell
-python libraries/NanoUI/tools/font_builder.py --config libraries/NanoUI/examples/FirstApp/nanoui-assets.json
+python libraries/NanoUI/tools/resource_gui.py --config libraries/NanoUI/examples/FirstApp/nanoui-assets.json fonts
 ```
 
 这个命令会写入配置所指的 `src/generated/`，并保留上一次文件的 `.bak` 备份；它不是只读操作。检查生成差异，并在 App 构建中编译新文件。图片工具同样使用应用配置：
 
 ```powershell
-python libraries/NanoUI/tools/asset_builder.py --config libraries/NanoUI/examples/FirstApp/nanoui-assets.json
+python libraries/NanoUI/tools/resource_gui.py --config libraries/NanoUI/examples/FirstApp/nanoui-assets.json images
 ```
 
 也可以直接打开资源选择器；它同样需要 Tkinter：

@@ -3,10 +3,12 @@
 
 #include <stdint.h>
 #include <string.h>
-#include "main.h" // 引入 HAL 库用于操作 Flash
+#include "main.h" // 引入 HAL 库用于 Flash 页常量
+#include "flash_store.h"
 #include "../../../shared/settings_contract.h"
 #include "../../../shared/watch_face.h"
 #include "../../../shared/product_preferences.h"
+#include "bw16_voltage_config.h"
 #include <stddef.h>
 #include <math.h>
 
@@ -56,7 +58,7 @@ extern SystemConfig sys_cfg;
 
 class ConfigManager {
 public:
-    enum class SaveResult { Saved, UnlockFailed, EraseFailed, ProgramFailed, LockFailed };
+    enum class SaveResult { Saved, Busy, UnlockFailed, EraseFailed, ProgramFailed, LockFailed };
 
     static void normalizeWatchFace() {
         const uint8_t tag[5] = {0x57, 0x46, 0x01, 0xA5, 0x5A};
@@ -69,6 +71,7 @@ public:
     static const char* saveError(SaveResult result) {
         switch (result) {
         case SaveResult::Saved: return "none";
+        case SaveResult::Busy: return "busy";
         case SaveResult::UnlockFailed: return "unlock";
         case SaveResult::EraseFailed: return "erase";
         case SaveResult::ProgramFailed: return "program";
@@ -77,66 +80,51 @@ public:
         return "unknown";
     }
     static void load() {
-        SystemConfig* flash_cfg = (SystemConfig*)CONFIG_FLASH_ADDR;
-        
-        // 检查魔数：如果 Flash 里确实存过我们的配置，就拷贝到 RAM
-        if (flash_cfg->magic_word == SYS_CONFIG_MAGIC) {
-            memcpy(&sys_cfg, flash_cfg, sizeof(SystemConfig));
+        // Read through the existing FlashStore so the page bytes can also be
+        // exercised by the host fixture. Semantics/address/format are unchanged.
+        SystemConfig stored{};
+        const bool read_ok =
+            FlashStore::read(CONFIG_FLASH_ADDR, &stored, sizeof(stored)) == FlashStore::Result::Ok;
+        const bool base_valid = read_ok && stored.magic_word == SYS_CONFIG_MAGIC;
+        if (base_valid) {
+            memcpy(&sys_cfg, &stored, sizeof(sys_cfg));
             normalizeWatchFace();
-        } else {
-            // 如果是新片子或者没存过，sys_cfg 保持默认值不变，不用管它
         }
+        // If Flash was never stored, sys_cfg keeps its defaults.
         CrabitPreferences::Record trailer{};
-        memcpy(&trailer, reinterpret_cast<const uint8_t*>(flash_cfg) + sizeof(SystemConfig), sizeof(trailer));
+        FlashStore::read(CONFIG_FLASH_ADDR + sizeof(SystemConfig), &trailer, sizeof(trailer));
         // A missing/corrupt legacy base cannot make an orphan trailer trusted.
-        CrabitPreferences::load(flash_cfg->magic_word == SYS_CONFIG_MAGIC ? trailer : CrabitPreferences::Record{});
+        CrabitPreferences::load(base_valid ? trailer : CrabitPreferences::Record{});
+        Crabit::Bw16Voltage::Record voltage{};
+        FlashStore::read(CONFIG_FLASH_ADDR + sizeof(SystemConfig) + sizeof(CrabitPreferences::Record),
+                         &voltage, sizeof(voltage));
+        // Erased/legacy/truncated/corrupt records fall back to 3.0 V.
+        Crabit::Bw16Voltage::load(base_valid ? voltage : Crabit::Bw16Voltage::Record{});
     }
 
     static SaveResult save() {
         // Preserve the existing bytes/address/page/format. A failed erase or
         // partial program cannot be rolled back: RAM remains applied, but the
-        // caller must NOT claim persistence. Always attempt to re-lock Flash.
-        if (HAL_FLASH_Unlock() != HAL_OK) {
-            HAL_FLASH_Lock();
-            return SaveResult::UnlockFailed;
-        }
-
-        // 1. 擦除整页 (2KB)
-        FLASH_EraseInitTypeDef erase{};
-        erase.TypeErase = FLASH_TYPEERASE_PAGES;
-        erase.Banks = FLASH_BANK_1;
-        erase.Page = CONFIG_FLASH_PAGE;
-        erase.NbPages = 1;
-        
-        uint32_t PageError = 0xFFFFFFFFu;
-        if (HAL_FLASHEx_Erase(&erase, &PageError) != HAL_OK || PageError != 0xFFFFFFFFu) {
-            HAL_FLASH_Lock();
+        // caller must NOT claim persistence.
+        FlashStore::Transaction tx;
+        if (!tx.entered()) return SaveResult::Busy;
+        if (tx.status() == FlashStore::Result::Unlock) return SaveResult::UnlockFailed;
+        if (tx.erasePages(CONFIG_FLASH_PAGE, 1) != FlashStore::Result::Ok)
             return SaveResult::EraseFailed;
-        }
-
-        // 2. 将 RAM 里的配置按双字 (64-bit) 写入 Flash
-        size_t write_cnt = (sizeof(SystemConfig) + 7) / 8; // 向上取整计算写入次数
-        
-        for (size_t i = 0; i < write_cnt; i++) {
-            uint64_t word;
-            memcpy(&word, reinterpret_cast<const uint8_t*>(&sys_cfg) + i * 8, 8);
-            if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD,
-                                  CONFIG_FLASH_ADDR + (i * 8), word) != HAL_OK) {
-                HAL_FLASH_Lock();
-                return SaveResult::ProgramFailed;
-            }
-        }
-
-        const auto preferences = CrabitPreferences::sealed();
-        uint64_t trailer_word = 0;
-        memcpy(&trailer_word, &preferences, sizeof(trailer_word));
-        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD,
-                CONFIG_FLASH_ADDR + sizeof(SystemConfig), trailer_word) != HAL_OK) {
-            HAL_FLASH_Lock();
+        if (tx.program(CONFIG_FLASH_ADDR, &sys_cfg, sizeof(sys_cfg)) != FlashStore::Result::Ok)
             return SaveResult::ProgramFailed;
-        }
-
-        return HAL_FLASH_Lock() == HAL_OK ? SaveResult::Saved : SaveResult::LockFailed;
+        const auto preferences = CrabitPreferences::sealed();
+        if (tx.program(CONFIG_FLASH_ADDR + sizeof(SystemConfig), &preferences,
+                       sizeof(preferences)) != FlashStore::Result::Ok)
+            return SaveResult::ProgramFailed;
+        // The target voltage trailer never touches the PMU; the boot helper
+        // consumes it on the next normal BW16 start.
+        const auto voltage = Crabit::Bw16Voltage::sealed();
+        if (tx.program(CONFIG_FLASH_ADDR + sizeof(SystemConfig) + sizeof(CrabitPreferences::Record),
+                       &voltage, sizeof(voltage)) != FlashStore::Result::Ok)
+            return SaveResult::ProgramFailed;
+        return tx.close() == FlashStore::Result::Ok ? SaveResult::Saved
+                                                    : SaveResult::LockFailed;
     }
 
     // Called only by the UI owner's EventBus drain. Never replace sys_cfg with
@@ -161,6 +149,14 @@ public:
 static_assert(sizeof(SystemConfig) == 48, "Keep existing config Flash format");
 static_assert(sizeof(SystemConfig) + sizeof(CrabitPreferences::Record) <= FLASH_PAGE_SIZE,
               "Preferences must stay inside the existing config page");
+static_assert(sizeof(SystemConfig) + sizeof(CrabitPreferences::Record) +
+                      sizeof(Crabit::Bw16Voltage::Record) <=
+                  FLASH_PAGE_SIZE,
+              "The BW16 voltage trailer must stay inside the existing config page");
+static_assert((sizeof(SystemConfig) + sizeof(CrabitPreferences::Record)) % 8 == 0,
+              "The BW16 voltage trailer keeps doubleword alignment");
+static_assert(sizeof(SystemConfig) + sizeof(CrabitPreferences::Record) == 56,
+              "Keep the BW16 voltage trailer after the unchanged 48+8 layout");
 static_assert(offsetof(SystemConfig, brightness) == 36, "Keep old display settings offsets");
 static_assert(offsetof(SystemConfig, enable_ble) == 41, "Keep old BLE settings offset");
 static_assert(offsetof(SystemConfig, watch_face) == 42, "Use only old tail padding");

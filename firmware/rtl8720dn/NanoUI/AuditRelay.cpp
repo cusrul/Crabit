@@ -1,4 +1,5 @@
 #include "AuditRelay.h"
+#include "comms_link.h"
 #include "Protocol.h"
 #include "audit_contract.h"
 #include <FreeRTOS.h>
@@ -124,7 +125,7 @@ void tick() {
     const size_t chunk =
         length - offset < CrabitAudit::ChunkBytes ? length - offset : CrabitAudit::ChunkBytes;
     CrabitAudit::hex(active + offset, chunk, value + prefix);
-    Protocol::send_message_checked(CrabitAudit::PutTopic, value, request);
+    CrabitLink::send(CrabitAudit::PutTopic, value, request);
     waiting = true;
     sentAt = millis();
     currentStatus = "正在传给主控";

@@ -85,12 +85,28 @@ add_subdirectory(Core/NanoUI)
 # 5. 配置源文件与链接库
 # ==========================================================
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    Core/Src/nanoui_port.cpp  # NanoUI 硬件桥接文件
-    Core/Src/companion_ble.cpp
-    Core/Src/network_weather.cpp
-    Core/Src/companion_trace.cpp
+    Core/Src/nanoui_port.cpp
+    Core/Src/app_services.cpp  # NanoUI 硬件桥接文件
+    Core/Src/comms_link.cpp
+    Core/Src/flash_store.cpp
+    Core/Src/health.cpp
+    Core/Src/usb.cpp
+    Core/Src/startup.cpp
+    product/board/board.cpp
+    product/services/settings/settings_service.cpp
+    product/services/link/link_queue.cpp
+    product/features/audit/audit_service.cpp
+    product/services/diagnostics/diagnostic_service.cpp
+    Core/Src/i2c_bus.cpp
+    Core/Src/sensor_task.cpp
+    Core/Src/display.cpp
+    Core/Src/uart_task.cpp
+    product/features/companion/companion_ble.cpp
+    product/features/network/network_weather.cpp
+    product/services/diagnostics/companion_trace.cpp
     Core/Src/app_bw16_flash.cpp
     Core/Src/axp2101.c
+    product/services/audio/game_tone_service.cpp
 )
 
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
@@ -99,7 +115,15 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # 自定义头文件目录加在这里
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shared
+    ${CMAKE_CURRENT_SOURCE_DIR}/product/board
+    ${CMAKE_CURRENT_SOURCE_DIR}/product/features/companion
+    ${CMAKE_CURRENT_SOURCE_DIR}/product/services/link
+    ${CMAKE_CURRENT_SOURCE_DIR}/product/services/settings
+    ${CMAKE_CURRENT_SOURCE_DIR}/product/services/diagnostics
+    ${CMAKE_CURRENT_SOURCE_DIR}/product/services/audio
+    ${CMAKE_CURRENT_SOURCE_DIR}/product/features/audit
+    ${CMAKE_CURRENT_SOURCE_DIR}/product/features/network
 )
 
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE

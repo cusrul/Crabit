@@ -10,7 +10,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "firmware/rtl8720dn/NanoUI/app/wifi_sniff_diagnostics.h"
+HEADER = ROOT / "firmware/rtl8720dn/NanoUI/app/core/wifi_sniff_diagnostics.h"
 
 
 HOST_DRIVER = r"""

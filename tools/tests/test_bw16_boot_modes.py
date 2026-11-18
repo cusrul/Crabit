@@ -20,15 +20,29 @@ class BootModeTest(unittest.TestCase):
         self.assertNotIn("xTaskCreate", radio)
         self.assertNotIn("xTaskNotify", radio)
         self.assertNotIn("millis() - boot_time > 5000", entry)
-        self.assertIn('Protocol::send_message("diag/radio", "BOOT_READY")', entry)
+        self.assertIn('CrabitLink::send(Topics::DiagRadio, "BOOT_READY")', entry)
         setup = function(entry, "void main_setup()")
         self.assertNotIn("BLE.init", setup)
         self.assertNotIn("start_ui_mode()", setup)
         self.assertNotIn("WiFi.begin", setup)
+
+        # UI readiness must follow the panel claim, not precede it.
+        ui_start = function(entry, "bool start_ui_mode()")
+        hardware = ui_start.index("canvas.initHardware();")
+        bind = ui_start.index("AppManager::init(&canvas, &input);")
+        launch = ui_start.index("AppManager::launch(new LauncherApp());")
+        self.assertLess(hardware, bind)
+        self.assertLess(bind, launch)
+        self.assertIn("return is_display_active;", ui_start)
+        # Correlated UI commands are routed to the request-id-aware handler.
+        worker = function(entry, "void Task_UART_Worker(")
+        self.assertIn('strcmp(message.value, "UI") == 0', worker)
+
         fixture = r"""
 #include "AmebaTypes.h"
 #include <cassert>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
 class String {
@@ -44,9 +58,20 @@ public:
     String substring(int start) const { return value.substr(start); }
     String substring(int start, int end) const { return value.substr(start,end-start); }
 };
-namespace Protocol {
-    std::vector<std::string> replies;
-    void send_message(const char*, const char* value) { replies.push_back(value); }
+struct Topics {
+    static constexpr const char* SysAck = "sys/ack";
+    static constexpr const char* SysNotify = "sys/notify";
+};
+std::vector<std::string> order;
+namespace CrabitLink {
+    std::vector<std::string> topics, values, ids;
+    bool send(const char* topic, const char* value, uint16_t id=0) {
+        topics.push_back(topic ? topic : "");
+        values.push_back(value ? value : "");
+        ids.push_back(std::to_string((unsigned)id));
+        order.push_back(std::string("send:") + (value ? value : "") + ":" + std::to_string((unsigned)id));
+        return true;
+    }
 }
 namespace RadioSvc {
     enum Result { QUEUED, BUSY, REJECTED };
@@ -61,13 +86,23 @@ namespace NetManager {
     void stopBLE() { ++stops; }
     void setWiFi(bool on, String = "", String = "") { on ? ++wifi_on : ++wifi_off; }
 }
-namespace AppManager { int exits=0; void exitCurrentApp() { ++exits; } }
+namespace AppManager {
+    int exits=0;
+    void shutdown() { ++exits; order.push_back("shutdown"); }
+    void exitCurrentApp() { ++exits; order.push_back("exit"); }
+}
 int ui_starts=0, oled_releases=0, disconnects=0;
-void start_ui_mode() { ++ui_starts; }
-void releaseOledBus() { ++oled_releases; }
-struct Wifi { void disconnect() { ++disconnects; } } WiFi;
+bool ui_ready_result=true;
 volatile BW16Mode current_mode=MODE_WAITING;
 bool is_display_active=false, ble_was_connected=false;
+bool start_ui_mode() {
+    ++ui_starts;
+    order.push_back("ui_start");
+    is_display_active = ui_ready_result;
+    return ui_ready_result;
+}
+void releaseOledBus() { ++oled_releases; order.push_back("release"); }
+struct Wifi { void disconnect() { ++disconnects; } } WiFi;
 #define CRABIT_BW16_ENABLE_OTA 0
 """
         fixture += function(services, "static void applyNet(") + "\n"
@@ -76,24 +111,37 @@ bool is_display_active=false, ble_was_connected=false;
             + r"""
 void reset() {
     current_mode=MODE_WAITING; is_display_active=ble_was_connected=false;
-    RadioSvc::headless=false; Protocol::replies.clear();
+    RadioSvc::headless=false; ui_ready_result=true;
+    CrabitLink::topics.clear(); CrabitLink::values.clear(); CrabitLink::ids.clear();
+    order.clear();
     NetManager::starts=NetManager::stops=NetManager::wifi_on=NetManager::wifi_off=0;
     NetManager::last_ble_request_id=0;
     NetManager::next=RadioSvc::QUEUED;
     ui_starts=oled_releases=disconnects=AppManager::exits=0;
 }
-void rejected() { assert(!Protocol::replies.empty() && Protocol::replies.back()=="REJECTED"); }
+void rejected(uint16_t id=0) {
+    assert(!CrabitLink::values.empty() && CrabitLink::values.back()=="REJECTED");
+    assert(CrabitLink::ids.back()==std::to_string((unsigned)id));
+}
 int main() {
-    reset(); applyMode("UI"); assert(current_mode==MODE_UI && ui_starts==1);
+    // Legacy request_id == 0 still starts UI and sends no correlated answer.
+    reset(); applyMode("UI");
+    assert(current_mode==MODE_UI && ui_starts==1 && CrabitLink::values.empty());
     applyMode("BLE"); rejected(); assert(NetManager::starts==0 && current_mode==MODE_UI);
-    applyMode("UI"); rejected(); assert(ui_starts==1);
+    // Legacy UI outside MODE_WAITING stays silent: no new uncorrelated traffic.
+    CrabitLink::values.clear(); CrabitLink::ids.clear();
+    applyMode("UI"); assert(CrabitLink::values.empty()); assert(ui_starts==1);
     applyMode("WIFI"); rejected(); assert(current_mode==MODE_UI);
-    is_display_active=true; applyMode("EXIT");
+    is_display_active=true; order.clear(); applyMode("EXIT");
     assert(current_mode==MODE_SLEEP && oled_releases==1 && AppManager::exits==1);
-    applyMode("UI"); rejected(); assert(ui_starts==1);
+    assert(order.size()>=3 && order[0]=="shutdown" && order[1]=="release" &&
+           order[2]=="send:BW16_EXIT:0");
+    CrabitLink::values.clear(); CrabitLink::ids.clear();
+    applyMode("UI"); assert(CrabitLink::values.empty()); assert(ui_starts==1);
     reset(); applyMode("BLE"); assert(current_mode==MODE_BLE && NetManager::starts==1);
     assert(NetManager::last_ble_request_id==0); // Legacy/default invocation remains valid.
-    applyMode("UI"); rejected(); assert(ui_starts==0);
+    CrabitLink::values.clear(); CrabitLink::ids.clear();
+    applyMode("UI"); assert(CrabitLink::values.empty()); assert(ui_starts==0);
     applyNet("wifi_on,ssid,pass"); rejected(); assert(NetManager::wifi_on==0);
     applyMode("BLE"); rejected(); assert(NetManager::starts==1);
     reset(); applyMode("WIFI"); assert(current_mode==MODE_WIFI);
@@ -107,10 +155,29 @@ int main() {
     applyMode("OTA"); assert(current_mode==MODE_WAITING);
     reset(); RadioSvc::headless=true; applyMode("UI"); rejected(); applyNet("wifi_on,ssid,pass"); rejected();
     assert(ui_starts==0 && NetManager::wifi_on==0 && disconnects==0);
+    reset(); RadioSvc::headless=true; applyMode("UI", 0x4444); rejected(0x4444);
+    assert(ui_starts==0);
     reset(); NetManager::next=RadioSvc::BUSY; applyMode("BLE"); assert(current_mode==MODE_WAITING);
     NetManager::next=RadioSvc::REJECTED; applyMode("BLE"); rejected(); assert(current_mode==MODE_WAITING);
     reset(); applyMode("BLE", 0xBEEF);
     assert(current_mode==MODE_BLE && NetManager::starts==1 && NetManager::last_ble_request_id==0xBEEF);
+
+    // New handshake: the answer is echoed only after start_ui_mode() succeeded.
+    reset(); applyMode("UI", 0x1234);
+    assert(current_mode==MODE_UI && ui_starts==1);
+    assert(CrabitLink::values.back()=="UI_READY" && CrabitLink::ids.back()=="4660");
+    applyMode("UI", 0x2222);
+    rejected(0x2222);
+    // A failed panel claim is correlated and does not notify legacy firmware.
+    reset(); ui_ready_result=false; applyMode("UI", 0x2222);
+    assert(current_mode==MODE_UI && CrabitLink::values.back()=="UI_FAILED" &&
+           CrabitLink::ids.back()=="8738" && oled_releases==0);
+    // Correlated exit: app cleanup, then bus release, then the answer.
+    reset(); current_mode=MODE_UI; is_display_active=true; applyMode("EXIT", 0x3333);
+    assert(current_mode==MODE_SLEEP && CrabitLink::values.back()=="UI_EXIT" &&
+           CrabitLink::ids.back()=="13107");
+    assert(order.size()>=3 && order[0]=="shutdown" && order[1]=="release" &&
+           order[2]=="send:UI_EXIT:13107");
 }
 """
         )

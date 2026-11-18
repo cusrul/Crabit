@@ -16,7 +16,7 @@ class Stop2PatExtiGuard(unittest.TestCase):
         self.assertIn("HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_8)", body)
 
     def test_pat_mask_clear_before_nvic_and_pa6_pending_preserved(self):
-        text = (ROOT / "Inc/mcu_stop2.h").read_text(encoding="utf-8")
+        text = (ROOT / "Inc/stop2.h").read_text(encoding="utf-8")
         arm = text.split("void armAndStopTicks()", 1)[1].split("static void captureCore", 1)[0]
         self.assertLess(arm.index("EXTI->IMR1 = GPIO_PIN_6"), arm.index("__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_8)"))
         self.assertLess(arm.index("__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_8)"), arm.index("NVIC_ClearPendingIRQ(EXTI9_5_IRQn)"))

@@ -1,10 +1,10 @@
-#include "mcu_stop2_sequence.h"
-#include "wake_diag_format.h"
+#include "power_policy.h"
+#include "wake_log.h"
 #include <cassert>
 #include <cstring>
 #include <cstdio>
 #include <vector>
-using McuStop2::Reason;
+using Reason = Stop2::Reason;
 struct Port {
     Reason first = Reason::None, second = Reason::None, wake = Reason::Pa6;
     bool paused = false, halted = false, asleep = false, off = false, hardwareReady = true;
@@ -52,13 +52,13 @@ struct Port {
         steps.push_back(5);
     }
     bool buttonsReleased() const { return keys; }
-    McuStop2::Result wait() {
+    Stop2::Result wait() {
         assert(halted && paused && off && !hardwareReady);
         waited = true;
         steps.push_back(6);
         return {wake, true, 12, 0};
     }
-    void restoreClock(McuStop2::Result& r) {
+    void restoreClock(Stop2::Result& r) {
         assert(halted && paused);
         halted = false;
         r.hclk = 80000000;
@@ -85,71 +85,71 @@ int main() {
          {Reason::Usb, Reason::Radio, Reason::Busy, Reason::I2cFault, Reason::Keys}) {
         Port p;
         p.first = reason;
-        const auto r = McuStop2::run(p);
+        const auto r = Stop2::run(p);
         assert(r.reason == reason && !r.waited && p.steps == std::vector<int>{0});
     }
     {
         Port p;
-        const auto r = McuStop2::run(p);
+        const auto r = Stop2::run(p);
         assert(r.waited && r.reason == Reason::Pa6 && r.seconds == 12 && r.hclk == 80000000);
         assert((p.steps == std::vector<int>{0, 1, 2, 3, 11, 4, 5, 6, 7, 8, 12, 9, 10}));
     }
     {
         Port p;
         p.second = Reason::Usb;
-        const auto r = McuStop2::run(p);
+        const auto r = Stop2::run(p);
         assert(!r.waited && r.reason == Reason::Usb);
         assert((p.steps == std::vector<int>{0, 1, 2, 3, 9, 10}));
     }
     {
         Port p;
         p.ready = false;
-        const auto r = McuStop2::run(p);
+        const auto r = Stop2::run(p);
         assert(!r.waited && r.reason == Reason::InitFailed && p.hardwareReady && !p.paused);
         assert((p.steps == std::vector<int>{0, 1, 2, 3, 11, 4, 5, 7, 8, 12, 9, 10}));
     }
     {
         Port p;
         p.keys = false;
-        const auto r = McuStop2::run(p);
+        const auto r = Stop2::run(p);
         assert(!r.waited && r.reason == Reason::Keys && !p.off && p.hardwareReady);
     }
     {
         Port p;
         p.wake = Reason::Other;
-        const auto r = McuStop2::run(p);
+        const auto r = Stop2::run(p);
         assert(r.waited && r.reason == Reason::Other && !p.off && !p.paused);
     }
     {
         Port p;
         p.sensors = false;
-        const auto r = McuStop2::run(p);
+        const auto r = Stop2::run(p);
         assert(!r.waited && r.reason == Reason::SensorFailed);
         assert((p.steps == std::vector<int>{0, 1, 2, 3, 11, 12, 9, 10}));
     }
     {
         Port p;
         p.restored = false;
-        const auto r = McuStop2::run(p);
+        const auto r = Stop2::run(p);
         assert(r.waited && r.reason == Reason::SensorFailed && !p.paused);
     }
     {
         Port p;
         p.motion = true;
-        const auto r = McuStop2::run(p);
+        const auto r = Stop2::run(p);
         assert(!r.waited && r.reason == Reason::MotionPending && !p.paused);
         assert(p.off && p.hardwareReady && !p.halted);
         assert((p.steps == std::vector<int>{0, 1, 2, 3, 11, 4, 5, 7, 8, 12, 9}));
         // A retry with motion cleared still enters STOP2 and wakes normally.
         p.motion = false;
         p.steps.clear();
-        const auto retry = McuStop2::run(p);
+        const auto retry = Stop2::run(p);
         assert(retry.waited && !p.off && !p.paused && p.hardwareReady);
     }
     {
         Port p;
         p.wake = Reason::Qmi;
-        const auto r = McuStop2::run(p);
+        const auto r = Stop2::run(p);
         assert(r.waited && r.reason == Reason::Qmi);
         assert(!p.off && p.hardwareReady && !p.paused);
     }
@@ -157,7 +157,7 @@ int main() {
         Port p;
         p.wake = Reason::Qmi;
         p.restored = false;
-        const auto r = McuStop2::run(p);
+        const auto r = Stop2::run(p);
         assert(r.reason == Reason::SensorFailed && !p.off && p.hardwareReady && !p.paused);
     }
     char text[32];

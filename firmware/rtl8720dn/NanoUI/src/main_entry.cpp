@@ -1,10 +1,13 @@
 #include "NanoUI_Preflight.h"
+#include "crabit_shared/topics.h"
 #include "NanoUI.h"
 #include <SPI.h>
 #include <FreeRTOS.h>
 #include <task.h>
 #include <queue.h>
 #include "CrabitBuildProfile.h"
+#include "crabit_shared/command_router.h"
+#include "crabit_shared/comms_link.h"
 #if CRABIT_BW16_ENABLE_OTA
 #include <OTA.h>
 #include <AmebaMDNS.h>
@@ -22,7 +25,7 @@
 #include "../AmebaServices.h"
 #include "drivers/uart_input.h"
 #include "drivers/uart_sensors.h"
-#include "../app/launcher.h"
+#include "../app/core/launcher.h"
 #include "../bw16_oled.h"
 
 using namespace NanoUI;
@@ -123,13 +126,13 @@ void serviceBootDiag() {
 
   if (now - boot_diag_last_ms >= 1000) {
     boot_diag_last_ms = now;
-    if (current_mode == MODE_BLE) Protocol::send_message("diag/radio", "BLE_ALIVE");
+    if (current_mode == MODE_BLE) CrabitLink::send(Topics::DiagRadio, "BLE_ALIVE");
     else sendBootDiag("waiting");
     char counts[64];
     snprintf(counts, sizeof(counts), "UART_RX:%lu,%lu,%lu",
         (unsigned long)uart_trace_bytes, (unsigned long)uart_trace_frames,
         (unsigned long)uart_trace_bad);
-    Protocol::send_message("diag/radio", counts);
+    CrabitLink::send(Topics::DiagRadio, counts);
   }
 }
 
@@ -204,26 +207,30 @@ void run_ota_mode_tick() {
     // NetManager first; otherwise leave OTA mode rather than blocking forever
     // on placeholder credentials.
     if (WiFi.status() != WL_CONNECTED) {
-        Protocol::send_message("sys/notify", "OTA_WIFI_REQUIRED");
+        CrabitLink::send(Topics::SysNotify, "OTA_WIFI_REQUIRED");
         current_mode = MODE_SLEEP;
         return;
     }
 
     MDNS.begin();
     ota.beginOTA(8082);
-    Protocol::send_message("sys/notify", "OTA_READY");
+    CrabitLink::send(Topics::SysNotify, "OTA_READY");
 }
 #endif
 
-void start_ui_mode() {
+bool start_ui_mode() {
     if (!is_display_active) {
         sendBootDiag("ui_init_begin");
         canvas.initHardware(); is_display_active = true;
         sendBootDiag("ui_oled_ready");
+        // Only the UI mode binds the manager to this canvas and input.
+        AppManager::init(&canvas, &input);
+        sendBootDiag("appmgr_ready");
         AppManager::launch(new LauncherApp());
         sendBootDiag("ui_launcher_ready");
         ui_alive_last_ms = millis();
     }
+    return is_display_active;
 }
 
 void Task_UART_Worker(void *pvParameters) {
@@ -243,43 +250,45 @@ void Task_UART_Worker(void *pvParameters) {
                     if (CrabitWire::decode_frame(rx_buf, rx_ptr, payload, sizeof(payload), &actual) &&
                         CrabitWire::decode_message(payload, actual, &message)) {
                         ++uart_trace_frames;
-                        if (strcmp(message.topic, "audit/put") == 0) {
+                        if (strcmp(message.topic, Topics::AuditPut) == 0) {
                             AuditRelay::receive(message);
                             rx_ptr = 0;
                             continue;
                         }
                         if (strcmp(message.topic, "ack") == 0 ||
-                            strncmp(message.topic, "diag/", 5) == 0 ||
-                            strcmp(message.topic, "sys/settings") == 0 ||
-                            strcmp(message.topic, "sys/settings/set") == 0 ||
-                            strcmp(message.topic, "sys/prefs") == 0 ||
-                            strcmp(message.topic, "sys/prefs/set") == 0 ||
-                            strcmp(message.topic, "audit/read") == 0 ||
-                            strcmp(message.topic, "audit/ack") == 0 ||
-                            strcmp(message.topic, "app/usb") == 0 ||
-                            strcmp(message.topic, "app/net") == 0 ||
-                            strcmp(message.topic, "app/weather") == 0 ||
-                            strcmp(message.topic, "app/badusb") == 0) {
+                            strncmp(message.topic, Topics::DiagPrefix, 5) == 0 ||
+                            strcmp(message.topic, Topics::SysSettings) == 0 ||
+                            strcmp(message.topic, Topics::SysSettingsSet) == 0 ||
+                            strcmp(message.topic, Topics::SysPrefs) == 0 ||
+                            strcmp(message.topic, Topics::SysPrefsSet) == 0 ||
+                            strcmp(message.topic, Topics::AuditRead) == 0 ||
+                            strcmp(message.topic, Topics::AuditAck) == 0 ||
+                            strcmp(message.topic, Topics::AppUsb) == 0 ||
+                            strcmp(message.topic, Topics::AppNet) == 0 ||
+                            strcmp(message.topic, Topics::AppWeather) == 0 ||
+                            strcmp(message.topic, Topics::AppBadusb) == 0) {
                             AmebaServices::enqueueNotification(message);
                         }
-                        if (strcmp(message.topic, "sys/mode") == 0 && message.request_id &&
-                            (strcmp(message.value, "BLE") == 0 || strcmp(message.value, "WIFI") == 0)) {
+                        if (strcmp(message.topic, Topics::SysMode) == 0 && message.request_id &&
+                            (strcmp(message.value, "BLE") == 0 || strcmp(message.value, "WIFI") == 0 ||
+                             strcmp(message.value, "UI") == 0)) {
                             AmebaServices::enqueueMode(message);
-                        } else if (strcmp(message.topic, "sys/bw/pair") == 0) {
+                        } else if (strcmp(message.topic, Topics::SysBwPair) == 0) {
                             AmebaServices::enqueueModePair(message);
-                        } else if (strcmp(message.topic, "sys/comm") == 0) {
+                        } else if (strcmp(message.topic, Topics::SysComm) == 0) {
                             RadioSvc::traceCompanionReceived(message.request_id);
                             AmebaServices::enqueueCompanion(message);
-                        } else if (strcmp(message.topic, "sys/bw/ping") == 0 && message.request_id &&
+                        } else if (strcmp(message.topic, Topics::SysBwPing) == 0 && message.request_id &&
                                    strcmp(message.value, "BLE_UART") == 0) {
                             AmebaServices::enqueueUartProbe(message);
                         }
 #if CRABIT_BW16_ENABLE_NETWORK_SYNC
-                        else if (strncmp(message.topic, "net/", 4) == 0) {
+                        else if (strncmp(message.topic, Topics::NetPrefix, 4) == 0) {
                             NetworkSync::enqueue(message);
                         }
 #endif
-                        else AmebaEventBus::dispatch(message.topic, message.value);
+                        else if (!CrabitLink::dispatch(message.topic, message.value, message.request_id))
+                            AmebaEventBus::dispatch(message.topic, message.value);
                     } else {
                         ++uart_trace_bad;
                     }
@@ -299,17 +308,15 @@ void main_setup() {
     HAL_Time::init([]() -> uint32_t { return millis(); }, [](uint32_t ms) { delay(ms); });
     AmebaStore::initRuntimeQueues();
     sendBootDiag("hal_ready");
-    AmebaServices::init(); input.init(); virtual_pat.init();
+    AmebaServices::init(); input.init();
     sendBootDiag("services_ready");
     SensorManager::getInstance().registerSensor(&virtual_pat);
-    AppManager::init(&canvas, &input);
-    sendBootDiag("appmgr_ready");
     if (xTaskCreate(Task_UART_Worker, "UART_TSK", 1024, NULL, 3, NULL) == pdPASS) {
         RadioSvc::initTracing();
         sendBootDiag("uart_ready");
         // Informational only: STM32's existing delayed START remains valid.
         // No wireless SDK or OLED initialization has happened at this point.
-        Protocol::send_message("diag/radio", "BOOT_READY");
+        CrabitLink::send(Topics::DiagRadio, "BOOT_READY");
     } else {
         sendBootDiag("uart_failed");
     }

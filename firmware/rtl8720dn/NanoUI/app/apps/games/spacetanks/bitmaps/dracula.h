@@ -1,0 +1,64 @@
+#pragma once
+
+const uint8_t draculaFrameCount = 3;
+const uint8_t draculaFrameWidth = 16;
+const uint8_t draculaFrameHeight = 16;
+const uint8_t PROGMEM draculaFrames[][32] = {
+  /* Frame number 0
+                      
+                      
+           #     #    
+           #     #    
+          ##     ##   
+          # #   # #   
+         #  # # #  #  
+           # # # #    
+           #     #    
+           #     #    
+                      
+           #          
+                      
+                 #    
+                      
+                      
+  */
+  {0x00,0x00,0x00,0x40,0x30,0x9c,0x60,0x80,0x40,0x80,0x60,0x9c,0x30,0x40,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0b,0x00,0x00,0x00,0x00,0x00,0x23,0x00,0x00,0x00,0x00},
+  /* Frame number 1
+                      
+                      
+           #     #    
+           #     #    
+          ##     ##   
+          # #   # #   
+         #  # # #  #  
+           # # # #    
+           #     #    
+           #     #    
+                      
+                      
+           #          
+                      
+                      
+                 #    
+  */
+  {0x00,0x00,0x00,0x40,0x30,0x9c,0x60,0x80,0x40,0x80,0x60,0x9c,0x30,0x40,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x13,0x00,0x00,0x00,0x00,0x00,0x83,0x00,0x00,0x00,0x00},
+  /* Frame number 2
+                      
+                      
+           #     #    
+           #     #    
+          ##     ##   
+          # #   # #   
+         #  # # #  #  
+           # # # #    
+           #     #    
+           #     #    
+                 #    
+                      
+                      
+                      
+           #          
+                      
+  */
+  {0x00,0x00,0x00,0x40,0x30,0x9c,0x60,0x80,0x40,0x80,0x60,0x9c,0x30,0x40,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x43,0x00,0x00,0x00,0x00,0x00,0x07,0x00,0x00,0x00,0x00}
+};

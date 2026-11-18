@@ -1,12 +1,12 @@
-#include "wake_diag_format.h"
-#include "wake_metrics.h"
+#include "wake_log.h"
+#include "wake_log.h"
 #include <cassert>
 #include <cstring>
 #include <initializer_list>
 
 int main() {
     char text[32];
-    using WakeDiag::Row;
+    using Row = WakeDiag::Row;
     assert(WakeDiag::format(text, sizeof text, Row::Clock, 80000000));
     assert(strcmp(text, "80 MHz") == 0);
     assert(WakeDiag::format(text, sizeof text, Row::UiWait, 100, 9));

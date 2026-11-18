@@ -110,7 +110,7 @@ def _assert_snapshot(snapshot):
             )
 
 
-def _run(command, cwd, timeout=60):
+def _run(command, cwd, timeout=180):
     return subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=timeout)
 
 

@@ -1,5 +1,5 @@
-#include "sensor_stop2.h"
-#include "qmi_run_profile.h"
+#include "power_policy.h"
+#include "qmi_run.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>

@@ -12,7 +12,7 @@ from tools.render_bw16_small_fonts import block
 class MenuTextLifetimeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        source = (ROOT / "firmware/rtl8720dn/NanoUI/app/launcher.h").read_text(encoding="utf-8")
+        source = (ROOT / "firmware/rtl8720dn/NanoUI/app/core/launcher.h").read_text(encoding="utf-8")
         cls.factory = block(source, "inline Widget* buildModernAnimMenu(")
 
     def test_labels_outlive_factory(self):
@@ -20,7 +20,7 @@ class MenuTextLifetimeTests(unittest.TestCase):
         self.assertIn("live labels in Widget/RenderText: 2/2 2/2", output)
 
     def test_all_folder_callers_use_literal_pointer_containers(self):
-        source = (ROOT / "firmware/rtl8720dn/NanoUI/app/launcher.h").read_text(encoding="utf-8")
+        source = (ROOT / "firmware/rtl8720dn/NanoUI/app/core/launcher.h").read_text(encoding="utf-8")
         # The primary menu owns std::string members; only fixed folder factories
         # need borrowed literal pointers. Cover inactive profile branches too.
         folders = source.split("class BleFolderApp", 1)[1].split("class LauncherApp", 1)[0]

@@ -32,10 +32,20 @@ class Stm32DiagnosticContracts(unittest.TestCase):
             shutil.copyfile(ROOT / "firmware/stm32/Core/Inc/event_bus.h", inc / "event_bus.h")
             shutil.copyfile(ROOT / "firmware/stm32/Core/Inc/sys_config.h", inc / "sys_config.h")
             shutil.copyfile(
+                ROOT / "firmware/stm32/Core/Inc/bw16_voltage_config.h",
+                inc / "bw16_voltage_config.h",
+            )
+            shutil.copyfile(ROOT / "firmware/stm32/Core/Inc/flash_store.h", inc / "flash_store.h")
+            shutil.copyfile(ROOT / "firmware/stm32/product/services/settings/settings_service.h", inc / "settings_service.h")
+            shutil.copyfile(ROOT / "firmware/stm32/product/services/link/link_queue.h", inc / "link_queue.h")
+            shutil.copyfile(ROOT / "firmware/stm32/product/features/audit/audit_service.h", inc / "audit_service.h")
+            shutil.copyfile(ROOT / "firmware/stm32/product/services/diagnostics/diagnostic_service.h", inc / "diagnostic_service.h")
+            shutil.copyfile(
                 ROOT / "firmware/stm32/Core/Inc/ameba_session.h", inc / "ameba_session.h"
             )
             shutil.copyfile(ROOT / "firmware/shared/crabit_wire.h", shared / "crabit_wire.h")
-            for name in ("audit_contract.h", "audit_spool.h"):
+            for name in ("audit_contract.h", "audit_spool.h", "command_router.h",
+                         "comms_link.h", "feature_registry.h", "topics.h"):
                 shutil.copyfile(ROOT / "firmware/shared" / name, shared / name)
             shutil.copyfile(ROOT / "firmware/shared/imu_telemetry.h", shared / "imu_telemetry.h")
             shutil.copyfile(
@@ -61,6 +71,24 @@ inline void CrabitUsb_ScriptHandle(const char*, size_t, char*, size_t) {
 """,
                 encoding="utf-8",
             )
+            (inc / "display.h").write_text(
+                "#pragma once\n#include <stdint.h>\n"
+                "extern \"C\" void OLED_WR_Byte(uint8_t, uint8_t);\n"
+                "extern \"C\" void OLED_Init();\n"
+                "extern \"C\" void OLED_SetSleep(bool);\n"
+                "class Display { public: static void setBrightness(float) {}\n"
+                "  static void setInvert(bool) {} };\n"
+                "class WindowManager { public: static WindowManager* instance;\n"
+                "  void markDirty() {} };\n",
+                encoding="utf-8",
+            )
+            (inc / "usb.h").write_text(
+                "#pragma once\n#include <stddef.h>\n"
+                "class Usb { public: static void log(const char*, ...);\n"
+                "  static void scriptHandle(const char*, size_t, char*, size_t); };\n"
+                "#define USB_LOG(...) Usb::log(__VA_ARGS__)\n",
+                encoding="utf-8",
+            )
             (inc / "usart.h").write_text(
                 """
 #pragma once
@@ -78,7 +106,9 @@ class WindowManager { public: static WindowManager* instance; void markDirty() {
                 encoding="utf-8",
             )
             (inc / "main.h").write_text(
-                "#pragma once\n#ifndef __MAIN_H\n#define __MAIN_H\n#endif\n", encoding="utf-8"
+                "#pragma once\n#include <stdint.h>\nextern uint32_t fake_tick;\n"
+                "inline uint32_t HAL_GetTick() { return fake_tick; }\n",
+                encoding="utf-8",
             )
             (inc / "sensor_snapshot.h").write_text(
                 """
@@ -88,7 +118,8 @@ struct StmSensorSnapshot {
     struct { float ax, ay, az; bool is_valid; uint32_t timestamp; } imu;
     struct { int dx, dy; bool lifted; } optical;
     struct { float pressure, temperature; } pressure;
-    struct { float voltage; int percent; bool is_valid; bool is_charging; uint32_t timestamp; } battery;
+    struct { float voltage; int percent; bool is_valid; bool is_charging; uint32_t timestamp;
+             bool voltage_valid; bool charging_valid; } battery;
 };
 extern StmSensorSnapshot fake_snapshot;
 extern bool readable;
@@ -103,6 +134,8 @@ inline bool STM32_ReadSensorSnapshot(StmSensorSnapshot* out) {
                 """
 #pragma once
 using BaseType_t = int;
+using TickType_t = uint32_t;
+using UBaseType_t = unsigned;
 constexpr int pdTRUE = 1, pdFALSE = 0, pdPASS = 1;
 #define pdMS_TO_TICKS(x) (x)
 #define portYIELD_FROM_ISR(x) ((void)(x))
@@ -127,6 +160,7 @@ inline int xQueueSend(QueueHandle_t queue, const void* value, int) {
     queue->items.emplace_back((const char*)value, (const char*)value + queue->size); return 1;
 }
 inline int xQueueSendFromISR(QueueHandle_t q, const void* v, BaseType_t*) { return xQueueSend(q, v, 0); }
+inline unsigned uxQueueMessagesWaiting(QueueHandle_t queue) { return queue ? queue->items.size() : 0; }
 inline int xQueueReceive(QueueHandle_t queue, void* value, int) {
     if (queue->items.empty()) return 0;
     std::memcpy(value, queue->items.front().data(), queue->size); queue->items.pop_front(); return 1;
@@ -138,12 +172,19 @@ inline int xQueueReceive(QueueHandle_t queue, void* value, int) {
             source.write_text(
                 r"""
 #include "event_bus.h"
+#include "display.h"
+#include "sensor_snapshot.h"
+#include "usb.h"
 #include "sys_config.h"
 #include <cassert>
 #include <string>
 #include <iostream>
 #include <limits>
 uint32_t fake_tick = 1000;
+bool CrabitLink::send(const char* topic, const char* value, uint16_t id) {
+    return EventBus::tryPublish(topic, value, id);
+}
+bool CrabitLink::dispatch(const char*, const char*, uint16_t) { return false; }
 WindowManager* WindowManager::instance = nullptr;
 std::vector<QueueHandle_t> queues;
 StmSensorSnapshot fake_snapshot{};
@@ -157,16 +198,53 @@ volatile bool g_coproc_active = false;
 unsigned settings_flat_flash_unlock_calls = 0, settings_flat_flash_erase_calls = 0;
 unsigned settings_flat_flash_program_calls = 0, settings_flat_flash_lock_calls = 0;
 unsigned settings_flat_program_fail_call = 0;
-uint8_t settings_flat_flash_image[56] = {};
+uint8_t settings_flat_flash_image[64] = {};
 int settings_flat_unlock_status = HAL_OK, settings_flat_lock_status = HAL_OK;
 int settings_flat_erase_status = HAL_OK, settings_flat_program_status = HAL_OK;
 static_assert(sizeof(SystemConfig) == 48, "legacy config footprint must remain unchanged");
-static_assert(sizeof(settings_flat_flash_image) == 56, "fake flash includes the 8-byte trailer");
+static_assert(sizeof(settings_flat_flash_image) == 64,
+              "fake flash includes both 8-byte local trailers");
 unsigned oled_calls = 0;
 unsigned badusb_dispatches = 0;
 extern "C" void OLED_WR_Byte(uint8_t, uint8_t) { ++oled_calls; }
-void USB_LOG(const char*, ...) {}
+void Usb::log(const char*, ...) {}
+void Usb::scriptHandle(const char*, size_t, char* reply, size_t capacity) { if (capacity) reply[0] = 0; }
 void count_badusb(const char*) { ++badusb_dispatches; }
+
+// FlashStore host double: same transaction order and failure mapping as the
+// target, backed by the fixture's existing fake flash.
+bool FlashStore::init() { return true; }
+void* FlashStore::mutex_ = nullptr;
+FlashStore::Transaction::Transaction(uint32_t) : entered_(true) {
+    if (HAL_FLASH_Unlock() != HAL_OK) result_ = Result::Unlock;
+}
+FlashStore::Transaction::~Transaction() { close(); }
+FlashStore::Result FlashStore::Transaction::erasePages(uint32_t, uint32_t) {
+    FLASH_EraseInitTypeDef erase{};
+    erase.TypeErase = FLASH_TYPEERASE_PAGES;
+    erase.Banks = FLASH_BANK_1;
+    uint32_t error = 0;
+    return (HAL_FLASHEx_Erase(&erase, &error) == HAL_OK && error == 0xFFFFFFFFu)
+        ? Result::Ok : Result::Erase;
+}
+FlashStore::Result FlashStore::Transaction::program(uint32_t address, const void* data, size_t length) {
+    const uint8_t* bytes = static_cast<const uint8_t*>(data);
+    for (size_t offset = 0; offset < length; offset += 8) {
+        uint64_t word = 0xFFFFFFFFFFFFFFFFull;
+        const size_t chunk = (length - offset < 8) ? length - offset : 8;
+        std::memcpy(&word, bytes + offset, chunk);
+        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, address + offset, word) != HAL_OK)
+            return Result::Program;
+    }
+    return Result::Ok;
+}
+FlashStore::Result FlashStore::Transaction::close() {
+    if (closed_) return result_;
+    closed_ = true;
+    if (entered_ && HAL_FLASH_Lock() != HAL_OK && result_ == Result::Ok)
+        result_ = Result::Lock;
+    return result_;
+}
 
 void enqueue(const char* topic, const char* value, uint16_t id) {
     uint8_t payload[CrabitWire::PAYLOAD_SIZE]; size_t size;
@@ -177,7 +255,7 @@ void enqueue(const char* topic, const char* value, uint16_t id) {
 }
 CrabitWire::Message pop() {
     CrabitWire::Message message{};
-    assert(xQueueReceive(EventBus::tx_queue, &message, 0) == pdPASS);
+    assert(LinkQueue::receiveTx(message, 0));
     return message;
 }
 void ack(uint16_t id) {
@@ -198,7 +276,7 @@ std::string businessReply(const char* topic, const char* payload, uint16_t id) {
     const auto message = pop();
     assert(std::string(message.topic) == topic && message.request_id == id);
     assert(message.value_len <= CrabitWire::MAX_VALUE);
-    assert(EventBus::tx_queue->items.empty()); // business result is the correlated same-topic reply
+    assert(LinkQueue::txDepth() == 0); // business result is the correlated same-topic reply
     return message.value;
 }
 int main() {
@@ -208,14 +286,14 @@ int main() {
     auto rejected = pop();
     assert(std::string(rejected.topic) == "app/badusb");
     assert(std::string(rejected.value) == "UNSUPPORTED" && rejected.request_id == 11);
-    assert(legacy_script_writes == 0 && EventBus::tx_queue->items.empty());
+    assert(legacy_script_writes == 0 && LinkQueue::txDepth() == 0);
     assert(EventBus::subscribe("app/badusb", count_badusb));
     enqueue("diag/echo", "first", 1); enqueue("diag/echo", "second", 2);
     EventBus::processPending(0);
-    assert(EventBus::tx_queue->items.empty());
+    assert(LinkQueue::txDepth() == 0);
     EventBus::processPending(1);
     assert(std::string(pop().value) == "first"); ack(1);
-    assert(EventBus::tx_queue->items.empty());
+    assert(LinkQueue::txDepth() == 0);
     EventBus::processPending();
     assert(std::string(pop().value) == "second"); ack(2);
     fake_snapshot.published_at = 123;
@@ -245,7 +323,7 @@ int main() {
     assert(std::string(pop().value).find("valid=0") != std::string::npos); ack(10);
 
     fake_tick = 1000;
-    fake_snapshot.battery = {3.85f, 88, true, true, 990};
+    fake_snapshot.battery = {3.85f, 88, true, true, 990, true, true};
     auto battery = businessReply("diag/battery", "read", 14);
     assert(battery == "mv=3850;pct=88;charging=1;valid=1;at=990;age=10");
     assert(businessReply("diag/battery", "status", 15) == "invalid");
@@ -257,8 +335,24 @@ int main() {
     assert(battery == "mv=3850;pct=88;charging=1;valid=1;at=4294967280;age=21");
     fake_snapshot.battery.is_valid = false;
     battery = businessReply("diag/battery", "read", 18);
-    assert(battery == "mv=0;pct=0;charging=1;valid=0;at=4294967280;age=21");
+    assert(battery == "mv=0;pct=0;charging=0;valid=0;at=4294967280;age=21");
     fake_snapshot.battery.is_valid = true;
+    fake_snapshot.battery.percent = -1;
+    assert(businessReply("diag/battery", "read", 19) ==
+           "mv=3850;pct=0;charging=1;valid=0;at=4294967280;age=21");
+    assert(snapshot(20).find(";bat=-1;") != std::string::npos);
+    fake_snapshot.battery.percent = 0;
+    assert(businessReply("diag/battery", "read", 21) ==
+           "mv=3850;pct=0;charging=1;valid=1;at=4294967280;age=21");
+    assert(snapshot(22).find(";bat=0;") != std::string::npos);
+    fake_snapshot.battery.percent = 99;
+    fake_snapshot.battery.voltage_valid = false;
+    assert(businessReply("diag/battery", "read", 23) ==
+           "mv=0;pct=99;charging=1;valid=0;at=4294967280;age=21");
+    fake_snapshot.battery.voltage_valid = true;
+    fake_snapshot.battery.charging_valid = false;
+    assert(businessReply("diag/battery", "read", 24) ==
+           "mv=3850;pct=99;charging=0;valid=0;at=4294967280;age=21");
 
     // Real settings read/set handlers return a correlated business response.
     readable = true;
@@ -292,6 +386,14 @@ int main() {
            !(saved_preferences.flags & CrabitPreferences::Qmi) &&
            !(saved_preferences.flags & CrabitPreferences::Sound) &&
            !(saved_preferences.flags & CrabitPreferences::Led));
+    // A remote settings save also persists the local BW16 voltage target.
+    Crabit::Bw16Voltage::Record saved_voltage{};
+    std::memcpy(&saved_voltage,
+                settings_flat_flash_image + sizeof(SystemConfig) +
+                    sizeof(CrabitPreferences::Record),
+                sizeof(saved_voltage));
+    assert(Crabit::Bw16Voltage::valid(saved_voltage) && saved_voltage.code == 0);
+    assert(Crabit::Bw16Voltage::targetMv() == 3000);
 
     enqueue("sys/settings", "read", 20); EventBus::processPending(1);
     auto settings = pop();
@@ -371,7 +473,13 @@ int main() {
                     str(ROOT / "tools/tests/settings_flat_fakes/fake_hal.h"),
                     "-I",
                     str(inc),
+                    "-I",
+                    str(shared),
                     str(source),
+                    str(ROOT / "firmware/stm32/product/services/settings/settings_service.cpp"),
+                    str(ROOT / "firmware/stm32/product/services/link/link_queue.cpp"),
+                    str(ROOT / "firmware/stm32/product/features/audit/audit_service.cpp"),
+                    str(ROOT / "firmware/stm32/product/services/diagnostics/diagnostic_service.cpp"),
                     "-o",
                     str(binary),
                 ],

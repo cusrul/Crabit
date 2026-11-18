@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from tools.tests import test_nanoui_original_extraction as current
 from tools.tests import test_nanoui_extraction_history as history
+from tools.tests.history_revisions import require_history
 
 
 class GuardRegressionTests(unittest.TestCase):
@@ -16,6 +17,7 @@ class GuardRegressionTests(unittest.TestCase):
         return result
 
     def test_historical_scope_rejects_out_of_scope_hardware_or_apps(self):
+        require_history(current.ROOT, current.BASE, current.INTEGRATION_SNAPSHOT)
         for path in (
             "firmware/stm32/Core/Inc/sys_power.h",
             "firmware/rtl8720dn/NanoUI/RadioSvc.cpp",
@@ -51,6 +53,7 @@ class GuardRegressionTests(unittest.TestCase):
         self.assertNotIn("apps/mobile/lib/core/app_state.dart", allowed)
 
     def test_unchanged_bodies_are_still_protected(self):
+        require_history(current.ROOT, current.BASE)
         read = Path.read_text
         for piece in current.UNCHANGED_PIECES:
             with self.subTest(piece=piece):

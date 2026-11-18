@@ -15,6 +15,7 @@ import unittest
 from PIL import Image
 
 from tools import render_bw16_small_fonts as preview
+from tools.tests.history_revisions import require_history
 from tools.tests.test_bw16_product_fonts import ASSET, glyphs as generated_glyphs
 
 
@@ -137,7 +138,7 @@ def live_radar_event_block(source: str) -> str:
 class SnifferReadableUiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.source = (preview.BW / "app/app_wifi_sniff.h").read_text(encoding="utf-8")
+        cls.source = (preview.BW / "app/apps/wireless/app_wifi_sniff.h").read_text(encoding="utf-8")
         cls.generated = extracted_driver(cls.source)
 
     def test_only_paint_code_is_extracted_for_all_four_states(self):
@@ -159,6 +160,7 @@ class SnifferReadableUiTests(unittest.TestCase):
             self.assertFalse(missing, f"missing {size}px glyphs: {missing}")
 
     def test_rf_task_behavior_matches_pinned_baseline(self):
+        require_history(preview.ROOT, preview.BASELINE)
         baseline = preview.baseline_source()
         self.assertEqual(
             unchanged_task_source(baseline),

@@ -8,7 +8,6 @@
 #include <string>
 
 extern "C" {
-    extern I2C_HandleTypeDef hi2c1;
 }
 
 // 供不带捕获的 Lambda 转换为 C 风格回调时使用的指针。
@@ -21,16 +20,16 @@ private:
 
     void refreshState() {
         uint8_t ctrl = 0;
-        if (AXP2101_ReadReg(&hi2c1, AXP2101_DC_ONOFF_DVM_CTRL, &ctrl) == HAL_OK) {
+        if (AXP2101_ReadReg(AXP2101_DC_ONOFF_DVM_CTRL, &ctrl) == HAL_OK) {
             is_enabled = (ctrl & 0x04) != 0;
         }
-        current_mv = (int)AXP2101_GetDC3Voltage(&hi2c1);
+        current_mv = (int)AXP2101_GetDC3Voltage();
     }
 
     static void onApplyThunk() {
         if (g_dcdc_app_ptr) {
             auto app = static_cast<DCDC3CtrlApp*>(g_dcdc_app_ptr);
-            AXP2101_SetDC3Voltage(&hi2c1, (uint16_t)app->current_mv);
+            AXP2101_SetDC3Voltage((uint16_t)app->current_mv);
             AppManager::exitCurrentApp();
         }
     }
@@ -38,7 +37,7 @@ private:
     static void onToggleThunk(bool val) {
         if (g_dcdc_app_ptr) {
             static_cast<DCDC3CtrlApp*>(g_dcdc_app_ptr)->is_enabled = val;
-            AXP2101_SetDC3Enable(&hi2c1, val);
+            AXP2101_SetDC3Enable(val);
         }
     }
 

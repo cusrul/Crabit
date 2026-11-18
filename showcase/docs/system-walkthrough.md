@@ -72,7 +72,7 @@ const auto* data = &snapshot.imu;
 
 | 文件 | 职责 |
 | --- | --- |
-| `firmware/stm32/Core/Src/companion_ble.cpp` | STM32 后台蓝牙会话与状态 |
+| `firmware/stm32/product/features/companion/companion_ble.cpp` | STM32 后台蓝牙会话与状态 |
 | `firmware/stm32/Core/NanoUI/app_real/app_cyber_link.h` | 产品侧 BW16 入口与交接流程 |
 | `firmware/rtl8720dn/NanoUI/NanoUI.ino` | Arduino 产品构建入口 |
 | `firmware/rtl8720dn/NanoUI/src/main_entry.cpp` | Arduino 应用运行与模式处理 |

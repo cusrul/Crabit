@@ -1,7 +1,7 @@
 #pragma once
 #include "NanoUI/NanoUI.h"
 #include "hw_sensors.h"
-#include "qmi_run_probe.h"
+#include "qmi_run.h"
 #include "companion_ble.h"
 #include "ameba_session.h"
 #include <cstdio>
@@ -14,10 +14,10 @@ class QmiRunProbeApp : public Application {
     struct Bus {
         uint32_t base0 = 0, base1 = 0;
         bool read(uint16_t a, uint8_t r, uint8_t& v) {
-            return HAL_I2C_Mem_Read(&hi2c1, a, r, 1, &v, 1, 10) == HAL_OK;
+            return I2cBus::read(static_cast<uint8_t>(a), r, &v, 1, 10);
         }
         bool write(uint16_t a, uint8_t r, uint8_t v) {
-            return HAL_I2C_Mem_Write(&hi2c1, a, r, 1, &v, 1, 10) == HAL_OK;
+            return I2cBus::write(static_cast<uint8_t>(a), r, &v, 1, 10);
         }
         void delay() { HAL_Delay(1); }
         void armMotion() {
@@ -93,7 +93,7 @@ class QmiRunProbeApp : public Application {
             Crabit::CompanionBle::hardwareActive() ||
             Crabit::CompanionBle::hardwareTransitioning() ||
             SensorStop2::restoreFault.load(std::memory_order_relaxed) ||
-            I2cDiag::paused.load(std::memory_order_relaxed)) {
+            I2cFault::paused.load(std::memory_order_relaxed)) {
             lines[0] = "WMR BLOCKED";
             return;
         }

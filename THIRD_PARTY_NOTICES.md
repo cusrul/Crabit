@@ -16,9 +16,12 @@ Crabit 原创内容采用 GPL-3.0-only；第三方内容不因此被重新授权
 | three.js 离线资源 | [vendor LICENSE](apps/mobile/assets/watch_sim/vendor/LICENSE) | MIT，保留作者版权与声明 |
 | NanoUI 默认字体输入 | [字体 SOURCES](libraries/NanoUI/assets/fonts/SOURCES.md) | 各字体来源不同；WenQuanYi 头包含 GPL v2 与字体嵌入例外，需逐项检查 |
 | Fusion Pixel Font zh-Hans 8px BDF | [字体来源与版本](libraries/NanoUI/assets/fonts/fusion-pixel-8px/README.md)、[OFL 1.1](libraries/NanoUI/assets/fonts/fusion-pixel-8px/OFL.txt)、上游 `LICENSES/` 目录 | TakWolf，release `2026.10.16`；原样保留字体许可与上游字形来源 notices |
-| CastleBoy 移植 | [MIT](firmware/rtl8720dn/NanoUI/app/castle_boy/LICENSE) | 上游 `jlauener/CastleBoy`，固定提交 `1d758fdd862d6269dc459661779c52d75cc87f98`；copyright 2016 dir3kt，README credits ZappedCow / Increment；多份游戏实现与上游文件匹配 |
-| Arduboy3D 移植 | [MIT](firmware/rtl8720dn/NanoUI/app/arduboy3d/LICENSE) | 上游 `jhhoward/Arduboy3D`，固定提交 `929db9f3429cc20a318934099d992f1219a081bd`；James Howard 2019；保留原有 a1k0n 技术来源注记 |
-| Hopper 改编 | [MIT](firmware/rtl8720dn/NanoUI/app/LICENSE-Hopper.txt) | 上游 `obono/ArduboyWorks`，固定提交 `d4b1f041789dcd1d71907654e4025d613b4ab420`；OBONO 2016–2026；本项目为改编，不宣称逐文件原样复制 |
+| CastleBoy 移植 | [MIT](firmware/rtl8720dn/NanoUI/app/apps/games/castle_boy/LICENSE) | 上游 `jlauener/CastleBoy`，固定提交 `1d758fdd862d6269dc459661779c52d75cc87f98`；copyright 2016 dir3kt，README credits ZappedCow / Increment；多份游戏实现与上游文件匹配 |
+| Arduboy3D 移植 | [MIT](firmware/rtl8720dn/NanoUI/app/apps/games/arduboy3d/LICENSE) | 上游 `jhhoward/Arduboy3D`，固定提交 `929db9f3429cc20a318934099d992f1219a081bd`；James Howard 2019；保留原有 a1k0n 技术来源注记 |
+| Hopper 改编 | [MIT](firmware/rtl8720dn/NanoUI/app/apps/games/hopper/LICENSE) | 上游 `obono/ArduboyWorks`，固定提交 `d4b1f041789dcd1d71907654e4025d613b4ab420`；OBONO 2016–2026；本项目为改编，不宣称逐文件原样复制 |
+| Hollow Seeker 移植 | [MIT 与移植记录](firmware/rtl8720dn/NanoUI/app/apps/games/hollow/README.md) | 同一 `obono/ArduboyWorks` 固定提交的 `hollow/`；实验性 BW16 移植，保留原游戏与素材声明 |
+| SameGame 移植 | [MIT 与移植记录](firmware/rtl8720dn/NanoUI/app/apps/games/samegame/README.md) | 同一固定提交的 `samegame/`；实验性 BW16 移植，不将 AVR EEPROM 地址映射到 BW16 持久化分区 |
+| Lasers 移植 | [MIT 与移植记录](firmware/rtl8720dn/NanoUI/app/apps/games/lasers/README.md) | 同一固定提交的 `lasers/`；实验性 BW16 移植，替换 AVR 专用的函数分派方式 |
 
 这张表不覆盖所有源文件。ST 包级许可、其他传感器驱动、旧 App、参考目录和复制进来的实现也需继续追溯原始来源。
 `reference/` 里的许可证不能直接套用到名称类似、来源未确认的活动代码。

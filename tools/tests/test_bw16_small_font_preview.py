@@ -3,10 +3,12 @@
 import unittest
 
 from tools import render_bw16_small_fonts as preview
+from tools.tests.history_revisions import require_history as require_preview_history
 
 
 class SmallFontPreviewTests(unittest.TestCase):
     def test_extracts_product_paint_block_not_input_handler(self):
+        require_preview_history(preview.ROOT, preview.BASELINE)
         source = preview.baseline_source()
         paint = source[source.index("uint32_t ui_throttle_ms") :]
         scan = preview.block(paint, "if (state == STATE_MODE_SEL)")

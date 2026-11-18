@@ -10,6 +10,7 @@ import re
 import subprocess
 import unittest
 from pathlib import Path
+from tools.tests.history_revisions import require_history
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = "eaf49a1ae4dbe02900ddb7073d2f342568a9aa26"
@@ -204,6 +205,7 @@ def integration_phase_paths():
 
 
 def original(path, revision=BASE):
+    require_history(ROOT, revision)
     return (
         subprocess.check_output(["git", "show", f"{revision}:{path}"], cwd=ROOT)
         .decode("utf-8")
@@ -234,6 +236,7 @@ def original_body(name, text):
 
 
 def historical_changed_product_paths():
+    require_history(ROOT, BASE, INTEGRATION_SNAPSHOT)
     tracked = subprocess.check_output(
         [
             "git",
@@ -286,6 +289,7 @@ class OriginalExtractionTests(unittest.TestCase):
 
     def test_historical_display_callback_and_action_button_recover_fixed_product_source(self):
         path = "firmware/stm32/Core/NanoUI/app_real/app_settings.h"
+        require_history(ROOT, SETTINGS_FLAT_BASE, DISPLAY_CALLBACK_BASE)
         # Preserve the historical callback extraction proof at its final baseline.
         # The authorized flat page is now exercised by test_stm32_settings_flat.py;
         # it must not be forced back into the superseded multi-App source shape.

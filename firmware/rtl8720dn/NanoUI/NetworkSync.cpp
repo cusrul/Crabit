@@ -1,4 +1,6 @@
 #include "NetworkSync.h"
+#include "topics.h"
+#include "comms_link.h"
 #include "src/CrabitBuildProfile.h"
 
 #if CRABIT_BW16_ENABLE_NETWORK_SYNC
@@ -199,11 +201,11 @@ bool enqueueInput(const CrabitWire::Message& message) {
 }
 
 InputKind classify(const CrabitWire::Message& message) {
-    if (sameText(message.topic, "net/ssid")) return INPUT_SSID;
-    if (sameText(message.topic, "net/pass")) return INPUT_PASS;
-    if (sameText(message.topic, "net/place")) return INPUT_PLACE;
-    if (sameText(message.topic, "net/run")) return INPUT_RUN;
-    if (sameText(message.topic, "net/cancel")) return INPUT_CANCEL;
+    if (sameText(message.topic, Topics::NetSsid)) return INPUT_SSID;
+    if (sameText(message.topic, Topics::NetPass)) return INPUT_PASS;
+    if (sameText(message.topic, Topics::NetPlace)) return INPUT_PLACE;
+    if (sameText(message.topic, Topics::NetRun)) return INPUT_RUN;
+    if (sameText(message.topic, Topics::NetCancel)) return INPUT_CANCEL;
     return INPUT_INVALID;
 }
 
@@ -594,15 +596,15 @@ FetchResult fetchForecast(CrabitWeather::Day* days, uint8_t count) {
     client.setRecvTimeout(1000);
     // The Realtek SDK's connect() is synchronous and exposes no connect deadline.
     // Send before entering blocking SDK code; queued output cannot drain here.
-    if (!Protocol::send_message_checked("net/progress", "HTTPS_CONNECT", sessionId)) return FETCH_HTTP_FAILED;
+    if (!CrabitLink::send(Topics::NetProgress, "HTTPS_CONNECT", sessionId)) return FETCH_HTTP_FAILED;
     if (!client.connect("api.open-meteo.com", 443)) { client.stop(); return FETCH_HTTP_FAILED; }
-    if (!Protocol::send_message_checked("net/progress", "HTTP_SEND", sessionId)) {
+    if (!CrabitLink::send(Topics::NetProgress, "HTTP_SEND", sessionId)) {
         client.stop(); return FETCH_HTTP_FAILED;
     }
     if (client.write(reinterpret_cast<const uint8_t*>(request), size_t(requestLen)) != size_t(requestLen)) {
         client.stop(); return FETCH_HTTP_FAILED;
     }
-    if (!Protocol::send_message_checked("net/progress", "HTTP_READ", sessionId)) {
+    if (!CrabitLink::send(Topics::NetProgress, "HTTP_READ", sessionId)) {
         client.stop(); return FETCH_HTTP_FAILED;
     }
     const uint32_t started = millis();
@@ -619,10 +621,10 @@ FetchResult fetchForecast(CrabitWeather::Day* days, uint8_t count) {
             line[10] >= '0' && line[10] <= '9' && line[11] >= '0' && line[11] <= '9'
             ? unsigned(line[9]-'0')*100 + unsigned(line[10]-'0')*10 + unsigned(line[11]-'0') : 0;
         snprintf(detail, sizeof(detail), "http=%u", code);
-        Protocol::send_message_checked("net/detail", detail, sessionId);
+        CrabitLink::send(Topics::NetDetail, detail, sessionId);
         client.stop(); return FETCH_HTTP_FAILED;
     }
-    if (!Protocol::send_message_checked("net/progress", "HTTP_HEADERS", sessionId)) {
+    if (!CrabitLink::send(Topics::NetProgress, "HTTP_HEADERS", sessionId)) {
         client.stop(); return FETCH_HTTP_FAILED;
     }
     bool hasLength = false, chunked = false;
@@ -651,7 +653,7 @@ FetchResult fetchForecast(CrabitWeather::Day* days, uint8_t count) {
         }
     }
     size_t bodyLength = 0;
-    if (!Protocol::send_message_checked("net/progress", "HTTP_BODY", sessionId)) {
+    if (!CrabitLink::send(Topics::NetProgress, "HTTP_BODY", sessionId)) {
         client.stop(); return FETCH_HTTP_FAILED;
     }
     const bool received = readHttpBody(client, started, chunked, hasLength,
@@ -659,11 +661,11 @@ FetchResult fetchForecast(CrabitWeather::Day* days, uint8_t count) {
     char detail[64];
     snprintf(detail, sizeof(detail), "bytes=%u;ms=%lu;ok=%u", unsigned(bodyLength),
              (unsigned long)(millis()-started), received ? 1u : 0u);
-    Protocol::send_message_checked("net/detail", detail, sessionId);
-    Protocol::send_message_checked("net/progress", "WEATHER_CLOSE", sessionId);
+    CrabitLink::send(Topics::NetDetail, detail, sessionId);
+    CrabitLink::send(Topics::NetProgress, "WEATHER_CLOSE", sessionId);
     client.stop();
     if (!received) return FETCH_HTTP_FAILED;
-    if (!Protocol::send_message_checked("net/progress", "WEATHER_PARSE", sessionId)) return FETCH_HTTP_FAILED;
+    if (!CrabitLink::send(Topics::NetProgress, "WEATHER_PARSE", sessionId)) return FETCH_HTTP_FAILED;
     return parseForecast(httpBody, days, count) ? FETCH_OK : FETCH_PARSE_FAILED;
 }
 
@@ -708,20 +710,20 @@ void sendNextOutput() {
     OutputEvent event;
     if (xQueueReceive(outputQueue, &event, 0) != pdTRUE) return;
     char value[CrabitWire::MAX_VALUE + 1];
-    const char* topic = "net/status";
+    const char* topic = Topics::NetStatus;
     if (event.kind == OUTPUT_STATUS) {
         snprintf(value, sizeof(value), "%s", statusText(StatusCode(event.code)));
     } else if (event.kind == OUTPUT_TIME) {
-        topic = "net/time";
+        topic = Topics::NetTime;
         snprintf(value, sizeof(value), "%lu", (unsigned long)event.epoch);
     } else {
-        topic = "net/day";
+        topic = Topics::NetDay;
         const CrabitWeather::Day& day = forecast[event.dayIndex];
         snprintf(value, sizeof(value), "%u,%lu,%u,%d,%d,%u",
             unsigned(event.dayIndex), (unsigned long)day.date, unsigned(day.code),
             int(day.low), int(day.high), unsigned(day.rain));
     }
-    if (!Protocol::send_message_checked(topic, value, event.requestId)) {
+    if (!CrabitLink::send(topic, value, event.requestId)) {
         txFailure(event);
         return;
     }
@@ -749,7 +751,7 @@ void runStep() {
         break;
     case NTP_REQUEST: {
         ++ntpAttempts;
-        if (!Protocol::send_message_checked("net/progress", "NTP_REQUEST", sessionId)) {
+        if (!CrabitLink::send(Topics::NetProgress, "NTP_REQUEST", sessionId)) {
             failRun(STATUS_TX_FAILED); break;
         }
         if (!ntpStarted) {
@@ -757,7 +759,7 @@ void runStep() {
             ntpStarted = true;
             char socketDetail[32];
             snprintf(socketDetail, sizeof(socketDetail), "ntp_socket=%d", findNtpSocket(NTP_DEFAULT_LOCAL_PORT));
-            if (!Protocol::send_message_checked("net/detail", socketDetail, sessionId)) {
+            if (!CrabitLink::send(Topics::NetDetail, socketDetail, sessionId)) {
                 failRun(STATUS_TX_FAILED); break;
             }
         }
@@ -768,7 +770,7 @@ void runStep() {
         char detail[64];
         snprintf(detail, sizeof(detail), "ntp=%u;reason=%u;epoch=%lu", unsigned(ntpAttempts),
                  !updated ? 1u : valid ? 0u : 2u, (unsigned long)epoch);
-        if (!Protocol::send_message_checked("net/detail", detail, sessionId)) {
+        if (!CrabitLink::send(Topics::NetDetail, detail, sessionId)) {
             failRun(STATUS_TX_FAILED); break;
         }
         if (!valid) {

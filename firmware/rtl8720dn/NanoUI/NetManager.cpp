@@ -1,4 +1,6 @@
 #include "NetManager.h"
+#include "topics.h"
+#include "comms_link.h"
 
 #include "Protocol.h"
 
@@ -57,26 +59,26 @@ namespace NetManager {
     void tickWiFi() {
         if (wifi_connect_req) {
             wifi_connect_req = false;
-            Protocol::store_background_msg("sys/notify", "Wi-Fi Conn...");
+            Protocol::store_background_msg(Topics::SysNotify, "Wi-Fi Conn...");
 
             int status = WiFi.begin((char*)target_ssid.c_str(), target_pwd.c_str());
             if (status == WL_CONNECTED) {
                 IPAddress ip = WiFi.localIP();
                 String ip_str = String(ip[0]) + "." + String(ip[1]) + "." +
                                 String(ip[2]) + "." + String(ip[3]);
-                Protocol::store_background_msg("sys/notify", "WLAN OK: " + ip_str);
-                Protocol::send_to_stm32("{\"t\":\"sys/net\",\"v\":\"WIFI_ON\"}");
+                Protocol::store_background_msg(Topics::SysNotify, "WLAN OK: " + ip_str);
+                CrabitLink::send(Topics::SysNet, "WIFI_ON");
             } else {
-                Protocol::store_background_msg("sys/notify", "WLAN Failed!");
-                Protocol::send_to_stm32("{\"t\":\"sys/net\",\"v\":\"WIFI_OFF\"}");
+                Protocol::store_background_msg(Topics::SysNotify, "WLAN Failed!");
+                CrabitLink::send(Topics::SysNet, "WIFI_OFF");
             }
         }
 
         if (wifi_disconnect_req) {
             wifi_disconnect_req = false;
             WiFi.disconnect();
-            Protocol::store_background_msg("sys/notify", "WLAN Disconnected");
-            Protocol::send_to_stm32("{\"t\":\"sys/net\",\"v\":\"WIFI_OFF\"}");
+            Protocol::store_background_msg(Topics::SysNotify, "WLAN Disconnected");
+            CrabitLink::send(Topics::SysNet, "WIFI_OFF");
         }
     }
 

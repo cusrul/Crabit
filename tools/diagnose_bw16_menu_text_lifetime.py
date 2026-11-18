@@ -127,7 +127,7 @@ def run_probe(factory, out, expect_dangling=False):
 
 
 def main():
-    app = ROOT / "firmware/rtl8720dn/NanoUI/app/launcher.h"
+    app = ROOT / "firmware/rtl8720dn/NanoUI/app/core/launcher.h"
     factory = block(app.read_text(encoding="utf-8"), "inline Widget* buildModernAnimMenu(")
     print(run_probe(factory, ROOT / "build/menu-text-lifetime-diagnosis"), end="")
 

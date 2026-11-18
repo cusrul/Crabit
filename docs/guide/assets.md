@@ -16,6 +16,8 @@ NanoUI 把字体和图片数据编进应用，但资源生成不是 C++ 编译�
   `src/NanoUI/product/`，提取配置范围内的字符串和字号，检查输入字体覆盖，
   并生成 `nanoui_assets.h/.cpp` 及默认字体 provider。
 - `resource_gui.py` 帮助创建/选择配置，并打开字体生成界面。
+- 同一个 `resource_gui.py` 入口也支持 `check`、`fonts`、`images` 动作：
+  前两项不需要图形界面，分别只读检查和生成字体；`images` 打开图片编辑器。
 - `asset_builder.py` 打开原有图片/动画编辑工具。图片资源输出复用生成资源
   文件，字体与图片数据块协同写入；未知格式会被拒绝，而不是静默覆盖。
 
@@ -24,6 +26,9 @@ NanoUI 把字体和图片数据编进应用，但资源生成不是 C++ 编译�
 翻译字符串或自定义文本函数可能不会被发现，可用 `extra_text`、`sizes` 和
 `text_helpers` 显式补充。它不会扫描 `experimental`、生成目录、build 目录和
 备份目录。换句话说，扫描通过不等价于运行时每条路径都覆盖完整。
+扫描还排除根目录下面嵌套的 `examples`、`generated`、`build`、`.git`、`__pycache__` 与备份目录；
+若配置显式选中 `examples` 或 `build` 本身作为根目录，仍会扫描其源码。
+不要求拆出 `ui/` 或增加每 App 资源清单；继续使用现有平台配置和 `extra_text`。
 
 ## 先用应用自己的配置
 
@@ -42,15 +47,17 @@ NanoUI 把字体和图片数据编进应用，但资源生成不是 C++ 编译�
 
 ```powershell
 python -m pip install -r ../../tools/requirements.txt
-python ../../tools/font_builder.py --config nanoui-assets.json --check
-python ../../tools/font_builder.py --config nanoui-assets.json
+python ../../tools/resource_gui.py --config nanoui-assets.json check
+python ../../tools/resource_gui.py --config nanoui-assets.json fonts
 ```
 
 以上相对工具路径对应仓库的 `libraries/NanoUI/examples/FirstApp/` 工作目录；
 在其他 App 中使用时，应将 `../../tools/` 换成你所使用的 NanoUI 库工具路径。
 配置中的相对路径仍以 JSON 为基准。生成图片可运行
 `python ../../tools/asset_builder.py --config nanoui-assets.json`，随后在图形工具
-中编辑/导出。Python 3.10+ 与 Pillow 用于资源生成；Tkinter 仅供 GUI 使用，
+中编辑/导出，或使用统一入口 `python ../../tools/resource_gui.py --config nanoui-assets.json images`。
+旧 `font_builder.py --check` 和 `asset_builder.py` 命令继续兼容。
+Python 3.10+ 与 Pillow 用于资源生成；Tkinter 仅供 GUI 使用，
 导入视频另外需要 `opencv-python`。这些依赖不进入普通 C++ 构建。
 
 工具默认将 BDF 字体输入定位到库的 `assets/fonts/bdf`。可用的默认字号为
@@ -100,3 +107,8 @@ include path。检查构建输入比只看生成器退出码更重要。
 并不意味着应该把平台生成字典合并或互相覆盖。此处只说明路径和所有权，不对
 任何第三方字体、图片或未来打包发布作统一授权承诺；具体来源限制见
 [`assets/fonts/SOURCES.md`](../../libraries/NanoUI/assets/fonts/SOURCES.md)。
+
+BW16 示例配置输出到独立的 `build/font-examples-candidate`，不再覆盖产品 `src`。
+该目录只是候选：不会自动带入产品媒体，也不会自动替换构建输入。真正集成示例时
+需明确准备媒体和编译路径。当前只有已知配置的输出隔离测试，不提供任意配置间的
+自动冲突发现或并发写入锁；字体和图片仍使用现有共享资源文件格式。

@@ -1,0 +1,4 @@
+# Point clangd at the CMake export that lives under build/ rather than next to
+# the sources. The path is relative to this file.
+CompileFlags:
+  CompilationDatabase: build/MinSizeRel

@@ -5,19 +5,12 @@
 #include <cstdio>
 #include "FreeRTOS.h"
 #include "main.h"
-#include "wake_metrics.h"
-#include "wake_diag_format.h"
-#include "i2c_sample_trace.h"
+#include "wake_log.h"
+#include "i2c_bus.h"
 #include "sensor_snapshot.h"
-#include "usb_device.h"
 #include "sys_config.h"
-#include "qmi_wake_trace.h"
 extern SystemConfig sys_cfg;
 
-extern USBD_HandleTypeDef hUsbDeviceFS;
-static_assert(USBD_STATE_DEFAULT == 1 && USBD_STATE_ADDRESSED == 2 && USBD_STATE_CONFIGURED == 3 &&
-                  USBD_STATE_SUSPENDED == 4,
-              "Diagnostic USB state labels must match the active USB stack");
 
 class SysInfoApp : public Application {
    private:

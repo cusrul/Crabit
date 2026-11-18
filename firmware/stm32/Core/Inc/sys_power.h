@@ -9,24 +9,19 @@
 #endif
 
 #include "main.h"
+#include "display.h"
+#include "usb.h"
 #include <cmath>
 #include "sensor_snapshot.h"
-#include "usart.h"
-#include "i2c.h"
 #include "spi.h"
-#include "hw_display.h"
 #include "hw_sensors.h"
 #include "NanoUI/NanoUI.h"
 #include "sys_config.h"
 #include "event_bus.h" 
 #include "badusb_armory.h"
-#include "usbd_core.h"   
-#include "usb_device.h"  
-#include "wake_metrics.h"
-#include "mcu_stop2.h"
-#include "idle_sleep_policy.h"
-#include "wake_history.h"
-#include "wake_core_trace.h"
+#include "wake_log.h"
+#include "stop2.h"
+#include "power_policy.h"
 extern void STM32_ResetInputAfterWake();
 
 extern SystemConfig sys_cfg;
@@ -37,23 +32,17 @@ extern volatile uint32_t g_qmi_tap_cnt;
 extern volatile uint32_t g_qmi_tap_tick;
 
 extern "C" {
-    void OLED_Init(void); 
 }
-extern void OLED_SetSleep(bool sleep);
 extern "C" void SystemClock_Config(void);
 extern "C" void MX_USART1_UART_Init(void);
 extern "C" void MX_I2C1_Init(void);
 extern "C" void MX_SPI3_Init(void);
-extern "C" void MX_USB_DEVICE_Init(void); 
-extern USBD_HandleTypeDef hUsbDeviceFS;
 
 // 外设引用
 extern PAT9125_Driver pat_drv;
 extern QMI8658_Driver imu_drv;   
 extern BMP280_Driver bmp_drv;
 extern WindowManager wm;
-extern uint8_t rx_pingpong[2][512]; 
-extern volatile uint8_t rx_write_idx;
 extern volatile uint32_t g_pat_int_cnt;
 
 enum SysState { STATE_ACTIVE, STATE_SCREEN_OFF, STATE_SLEEP_PREP, STATE_DEEP_SLEEP, STATE_POWER_FAULT };
@@ -73,10 +62,8 @@ private:
     static uint32_t last_imu_tick;
 
     static void applyDisplayConfig() {
-        uint8_t contrast = (uint8_t)(sys_cfg.brightness * 255.0f);
-        OLED_WR_Byte(0x81, 0); 
-        OLED_WR_Byte(contrast, 0); 
-        OLED_WR_Byte(sys_cfg.invert_disp ? 0xA7 : 0xA6, 0);
+        Display::setBrightness(sys_cfg.brightness);
+        Display::setInvert(sys_cfg.invert_disp);
     }
 
     static void armPa6OnlyStop2Wake() {
@@ -131,7 +118,7 @@ private:
     static void restoreFromScreenOff() {
         // This path never lowered DC1 or cut the display rail. Do not reset
         // OLED or rewrite PMIC on an ordinary screen-only wake.
-        OLED_SetSleep(false);
+        Display::setSleep(false);
         applyDisplayConfig();
         current_state = STATE_ACTIVE;
         feed();
@@ -143,7 +130,7 @@ private:
         sensor_wake_locked = true;
         current_state = STATE_DEEP_SLEEP;
         const uint32_t previousAttempt = QmiWakeTrace::last.attempts;
-        const McuStop2::Result result = McuStop2::runWatch();
+        const Stop2::Result result = Stop2::runWatch();
         const auto& trace = QmiWakeTrace::last;
         const bool hasTrace = trace.attempts != previousAttempt;
         const uint32_t flags = uint32_t(result.reason) | (result.waited ? 0x100u : 0u) |
@@ -155,7 +142,7 @@ private:
         const uint32_t wom = hasTrace ? uint32_t(trace.status) | (uint32_t(trace.regs[4]) << 8) |
             (uint32_t(trace.regs[5]) << 16) | (uint32_t(trace.valid) << 24) : 0u;
         WakeHistory::record(HAL_GetTick(), WakeHistory::StopResult, flags, result.seconds, lines, wom);
-        if (result.waited && WakeCoreTrace::valid && result.reason == McuStop2::Reason::Other) {
+        if (result.waited && WakeCoreTrace::valid && result.reason == Stop2::Reason::Other) {
             const uint32_t tick = HAL_GetTick();
             const auto save = [tick](const WakeCoreTrace::Snapshot& s, bool before) {
                 WakeHistory::record(tick, before ? WakeHistory::CoreBefore : WakeHistory::CoreAfter,
@@ -174,7 +161,7 @@ private:
         WakeMetrics::stop_seconds.store(result.seconds, std::memory_order_relaxed);
         WakeMetrics::stop_hclk.store(result.hclk, std::memory_order_relaxed);
         if (result.waited) WakeMetrics::wakes.fetch_add(1, std::memory_order_relaxed);
-        if (!result.waited && result.reason == McuStop2::Reason::MotionPending) {
+        if (!result.waited && result.reason == Stop2::Reason::MotionPending) {
             // Keep the screen deadline expired; the existing retry limiter applies.
             current_state = STATE_SCREEN_OFF;
             screen_off_tick = HAL_GetTick();
@@ -184,7 +171,7 @@ private:
         }
         // Sensor registers were restored before tasks resumed; rails and OLED
         // were retained. SENS failures inhibit further sensor use until reboot.
-        OLED_SetSleep(false);
+        Display::setSleep(false);
         applyDisplayConfig();
 
         current_state = STATE_ACTIVE;
@@ -311,7 +298,7 @@ public:
         } 
         else {
             if (current_state == STATE_ACTIVE) { 
-                OLED_SetSleep(true); 
+                Display::setSleep(true); 
                 WakeHistory::record(now, WakeHistory::ScreenOff);
                 current_state = STATE_SCREEN_OFF; sensor_wake_locked = true; 
                 screen_off_tick = now;
@@ -328,9 +315,9 @@ public:
                 static uint32_t last_stop_check = 0;
                 if (uint32_t(now - last_stop_check) < 1000u) return;
                 last_stop_check = now;
-                McuStop2::WatchPort port;
-                const McuStop2::Reason blocked = port.blocked();
-                if (blocked != McuStop2::Reason::None) {
+                Stop2::WatchPort port;
+                const Stop2::Reason blocked = port.blocked();
+                if (blocked != Stop2::Reason::None) {
                     WakeMetrics::stop_reason.store(uint32_t(blocked), std::memory_order_relaxed);
                     return;
                 }

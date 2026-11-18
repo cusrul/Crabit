@@ -12,14 +12,21 @@
 #include "global_store.h" 
 #include "sensor_snapshot.h"
 #include "../../../shared/ble_shortcut_button.h"
-#include "app_real/components/ble_controls.h"
 #include "input_feedback.h"
 #include "../../../shared/product_preferences.h"
 #if CRABIT_QMI_RUN_PROBE
-#include "qmi_run_probe.h"
+#include "qmi_run.h"
 #endif
 
+// Set while the PAT surface has been touched for >= 800 ms without a swipe.
+// Games use it as an exit gesture so they do not need the side buttons.
+extern "C" volatile uint8_t crabit_pat_hold;
+
 class STM32Input : public InputDriver {
+public:
+    // Narrow UI-task hook: the platform layer must not know concrete UI actions.
+    using ShortcutHandler = void (*)();
+
 private:
     // --- PAT State (Optical Touch) ---
     int accum_x = 0, accum_y = 0;
@@ -35,6 +42,7 @@ private:
     // SW4 (PH3) - Right Top: OK (Short) / BACK (Long)
     uint8_t last_sw_dn, last_sw_ok;
     Crabit::BleShortcutButton up_button;
+    ShortcutHandler ble_shortcut_handler = nullptr;
     uint32_t last_trigger_time = 0; 
     uint32_t ok_press_start_time = 0;
     bool is_ok_pressed = false;
@@ -67,6 +75,10 @@ private:
     }
 
 public:
+    // Injected by Board in the UI task before keys.init(); init()/resetAfterWake()
+    // must never clear an already registered handler.
+    void setBleShortcutHandler(ShortcutHandler handler) { ble_shortcut_handler = handler; }
+
     void resetAfterWake() {
         init();
         accum_x = accum_y = 0;
@@ -112,7 +124,7 @@ public:
         if (up_event == Crabit::BleShortcutButton::ToggleBle) {
             last_trigger_time = now;
             dispatch({EVT_OK, 0}, true);
-            Crabit::toggleBleFromUi();
+            if (ble_shortcut_handler) ble_shortcut_handler();
             return {EVT_NONE, 0};
         }
         if (up_event == Crabit::BleShortcutButton::Up && now - last_trigger_time > 150) {
@@ -153,9 +165,11 @@ public:
             bool current_touch = !pdata->lifted; 
             if (current_touch && !is_touching) {
                 touch_start_time = now; accum_x = 0; accum_y = 0; is_swiping = false; 
+                crabit_pat_hold = 0;
                 if (now - pat_tap_timer > 300) pat_tap_count = 0;
             } else if (current_touch && is_touching) {
                 accum_x += pdata->dx; accum_y += pdata->dy;
+                if (!is_swiping && (now - touch_start_time) >= 800) crabit_pat_hold = 1;
                 if (abs(accum_x) > SWIPE_THRESH || abs(accum_y) > SWIPE_THRESH) {
                     is_swiping = true; pat_tap_count = 0; 
                     if (now - last_swipe_time > 60) {
@@ -167,6 +181,7 @@ public:
                 }
             } else if (!current_touch && is_touching) {
                 uint32_t duration = now - touch_start_time;
+                crabit_pat_hold = 0;
                 if (!is_swiping && duration > 20 && duration < 400) {
                     pat_tap_count++; pat_tap_timer = now; 
                 }
@@ -181,6 +196,7 @@ public:
         } else {
             is_touching = false; is_swiping = false;
             accum_x = accum_y = 0; pat_tap_count = 0;
+            crabit_pat_hold = 0;
         }
 
         // --- 3. Physical Buttons (Schematic: Left UP/DOWN, Right OK/BACK) ---

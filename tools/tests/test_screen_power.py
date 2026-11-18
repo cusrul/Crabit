@@ -78,19 +78,19 @@ class ScreenPowerHostTests(unittest.TestCase):
 
     def test_screen_off_sensor_worker_has_bounded_qmi_only_polling(self):
         # Source guard, not execution of the FreeRTOS worker or I2C interrupts.
-        port = (ROOT / "firmware/stm32/Core/Src/nanoui_port.cpp").read_text(encoding="utf-8")
-        marker = "} else if (SysPower::canPollGesture() && STM32_I2C_Lock(20)) {"
+        port = (ROOT / "firmware/stm32/Core/Src/sensor_task.cpp").read_text(encoding="utf-8")
+        marker = "} else if (SysPower::canPollGesture() && I2cBus::lock(20)) {"
         self.assertEqual(port.count(marker), 1)
         branch = port.split(marker, 1)[1].split("vTaskDelay(pdMS_TO_TICKS(5));", 1)[0]
         for gate in (
             "SysPower::canPollGesture()",
             "!Crabit::amebaSessionActive()",
             "!Crabit::CompanionBle::hardwareTransitioning()",
-            "HAL_I2C_GetState(&hi2c1) == HAL_I2C_STATE_READY",
+            "I2cBus::ready()",
             "imu_drv.checkTick(now)",
             "imu_drv.update();",
             "PublishSensorSnapshot(now);",
-            "STM32_I2C_Unlock();",
+            "I2cBus::unlock();",
         ):
             self.assertIn(gate, branch)
         for forbidden in ("RecoverSensorBus(", "AXP2101_", "SensorManager::", "BW16_"):

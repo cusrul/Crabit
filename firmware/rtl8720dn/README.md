@@ -18,3 +18,7 @@ Arduino IDE 需要安装仓库生成的共享 NanoUI ZIP，步骤见构建指南
 
 BW16 构建必须串行，不能与另一个 CLI/IDE 构建同时占用 SDK。lab profile 仅供编译/空间测量，不作烧录建议。
 打包镜像保护检查通过也不等于硬件验收，烧录与设备操作由用户完成。
+
+新增 Hollow Seeker、SameGame、Lasers 的可选源码移植与双区域构建见
+Arduboy 游戏实验。普通 IDE 默认不启用，
+后半段 Flash 执行尚未实机验证；实验产物不可直接上传。

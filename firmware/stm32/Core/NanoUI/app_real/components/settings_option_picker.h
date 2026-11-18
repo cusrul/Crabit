@@ -11,14 +11,16 @@ class RenderSettingsOptionPicker : public RenderObject {
     int* index;
     NanoUI::StaticVector<const char*, 8> options;
     NanoUI::Callback<void()> onChanged;
+    NanoUI::Callback<bool()> canEdit;
     bool editing = false;
     float offset = 0;
     int previous;
 
    public:
     RenderSettingsOptionPicker(int* value, NanoUI::StaticVector<const char*, 8> choices,
-                               NanoUI::Callback<void()> changed)
-        : index(value), options(choices), onChanged(changed), previous(*value) {}
+                               NanoUI::Callback<void()> changed,
+                               NanoUI::Callback<bool()> editable = {})
+        : index(value), options(choices), onChanged(changed), canEdit(editable), previous(*value) {}
 
     bool canFocus() override { return true; }
     void performLayout() override { size = constraints.constrainSize({46, 16}); }
@@ -27,6 +29,10 @@ class RenderSettingsOptionPicker : public RenderObject {
         if (!hasFocus)
             return false;
         if (event.type == EVT_OK) {
+            // A guarded picker still lets an active edit exit, but never starts
+            // one while its owner reports the setting unavailable.
+            if (!editing && canEdit && !canEdit())
+                return true;
             editing = !editing;
             return true;
         }
@@ -75,13 +81,15 @@ class SettingsOptionPicker : public Widget {
     int* index;
     NanoUI::StaticVector<const char*, 8> options;
     NanoUI::Callback<void()> onChanged;
+    NanoUI::Callback<bool()> canEdit;
 
    public:
     SettingsOptionPicker(int* value, NanoUI::StaticVector<const char*, 8> choices,
-                         NanoUI::Callback<void()> changed)
-        : index(value), options(choices), onChanged(changed) {}
+                         NanoUI::Callback<void()> changed,
+                         NanoUI::Callback<bool()> editable = {})
+        : index(value), options(choices), onChanged(changed), canEdit(editable) {}
     RenderObject* createRenderObject() override {
-        return new RenderSettingsOptionPicker(index, options, onChanged);
+        return new RenderSettingsOptionPicker(index, options, onChanged, canEdit);
     }
 };
 

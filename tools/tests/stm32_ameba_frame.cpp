@@ -6,6 +6,7 @@
 #include <vector>
 #include <deque>
 
+#include "comms_link.h"
 #include "ameba_session.h"
 #include "NanoUI/NanoUI.h"
 #include "event_bus.h"
@@ -13,6 +14,8 @@
 #include "companion_trace.h"
 #include "app_coproc.h"
 
+SystemConfig sys_cfg;
+volatile uint8_t crabit_pat_hold = 0;
 std::atomic<Crabit::AmebaPhase> Crabit::ameba_phase(Crabit::AmebaPhase::Inactive);
 NanoUI::Sensor* NanoUI::fake_pat_sensor = nullptr;
 
@@ -26,6 +29,7 @@ void Crabit::CompanionTrace::record(Event event, uint16_t, uint32_t a, uint32_t 
 }
 static uint32_t exits;
 bool fake_uart_rx_ready = true;
+bool fake_finish_claim_result = true;
 uint32_t fake_uart_rx_calls, fake_uart_rx_boot_tick, fake_uart_rx_call_tick;
 bool fake_pb7_uart_af, fake_uart_receive_to_idle;
 bool fake_mode_ble_adopt = true;
@@ -85,6 +89,10 @@ bool EventBus::tryPublish(const char* topic, const char* value, uint16_t session
     fake_try_publish_session = session;
     return fake_try_publish_result;
 }
+
+bool CrabitLink::send(const char* topic, const char* value, uint16_t id) {
+    return EventBus::tryPublish(topic, value, id);
+}
 namespace Crabit { namespace CompanionBle { uint16_t sessionId(); } }
 uint16_t Crabit::CompanionBle::sessionId() { return 0x4a31; }
 bool Crabit::CompanionBle::adoptModeBle() {
@@ -116,6 +124,7 @@ static void reset() {
     diagnostics.clear();
     exits = 0;
     fake_uart_rx_ready = true;
+    fake_finish_claim_result = true;
     fake_mode_ble_adopt = true;
     fake_mode_ble_adopt_calls = fake_mode_ble_finish_calls = 0;
     fake_mode_ble_finish_result.clear();
@@ -130,6 +139,7 @@ static void reset() {
     GlobalStore.ble_status[0] = '\0';
     gpio_a7 = GPIO_PIN_SET;
     gpio_a6 = GPIO_PIN_SET;
+    Crabit::Bw16Ui::cancel();
     Crabit::setAmebaPhase(Crabit::AmebaPhase::Inactive);
 }
 static void update(CyberLinkApp& app, uint32_t t) {
@@ -147,9 +157,9 @@ static int countPrefix(const char* prefix) {
     return result;
 }
 static std::string nextSensorMessage(CyberLinkApp& app, int old_count) {
-    for (int step = 0; step < 25 && countPrefix("publish:sns/all:") == old_count; ++step)
+    for (int step = 0; step < 25 && countPrefix("tryPublish:sns/all:") == old_count; ++step)
         update(app, fake_tick + 1);
-    if (countPrefix("publish:sns/all:") == old_count) return std::string();
+    if (countPrefix("tryPublish:sns/all:") == old_count) return std::string();
     return trace.back();
 }
 static void enterRunning(CyberLinkApp& app, Canvas& canvas, InputDriver& input,
@@ -172,10 +182,29 @@ static void enterRunning(CyberLinkApp& app, Canvas& canvas, InputDriver& input,
     CHECK(g_coproc_active);
     CHECK(has("tryPublish:sys/mode:UI"));
     CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Transition);
+    // The UI command must be correlatable; no ready claim exists yet.
+    CHECK(Crabit::Bw16Ui::requestId() != 0);
+    CHECK(Crabit::Bw16Ui::status() == Crabit::Bw16Ui::Status::Waiting);
     update(app, fake_tick + 149);
     CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Transition);
+    update(app, fake_tick + 1); // old 150ms mode gate, then wait for the answer
+    CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::AwaitUi);
+    CHECK(Crabit::Bw16Ui::status() == Crabit::Bw16Ui::Status::Waiting);
+    // The BW16 answers only after initHardware() and launcher creation.
+    CHECK(Crabit::Bw16Ui::acceptAck(Crabit::Bw16Ui::requestId(), "UI_READY"));
     update(app, fake_tick + 1);
+    CHECK(Crabit::Bw16Ui::status() == Crabit::Bw16Ui::Status::Ready);
     CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Running);
+}
+
+static void advanceToUiSend(CyberLinkApp& app, Canvas& canvas, InputDriver& input) {
+    app.onMount(&canvas, &input);
+    update(app, fake_tick);          // boot
+    update(app, fake_tick + 1200);   // RX repair
+    update(app, fake_tick + 1);      // handover start
+    update(app, fake_tick);          // paint
+    update(app, fake_tick + 149);    // existing 150ms release gate
+    update(app, fake_tick + 1);      // release, enqueue UI, enter ModeWait
 }
 
 int main() {
@@ -201,9 +230,9 @@ int main() {
     CHECK(Popup::saw("蓝牙正在启动") && !canvas.saw("等待蓝牙就绪"));
     CHECK(canvas.texts.empty() && wm.frames > 0); // Existing page + toast, no raw diagnostic screen.
     strcpy(GlobalStore.ble_status, "QUEUED");
-    int bg_sensor_count = countPrefix("publish:sns/all:");
+    int bg_sensor_count = countPrefix("tryPublish:sns/all:");
     update(background, fake_tick + 1);
-    CHECK(countPrefix("publish:sns/all:") > bg_sensor_count);
+    CHECK(countPrefix("tryPublish:sns/all:") > bg_sensor_count);
     CHECK(fake_mode_ble_adopt_calls == 0 && exits == 0 && !has("BW16_ForceOff"));
     strcpy(GlobalStore.ble_status, "ADVERTISING");
     update(background, fake_tick + 20);
@@ -330,11 +359,11 @@ int main() {
     CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Running);
     CHECK(canvas.saw("等待蓝牙就绪"));
     update(ble, fake_tick + 1);
-    CHECK(countPrefix("publish:sns/all:") > 0);
+    CHECK(countPrefix("tryPublish:sns/all:") > 0);
     input.events.push_back(UIEvent{EVT_UP, 0});
     update(ble, fake_tick + 1);
     update(ble, fake_tick + 19);
-    CHECK(trace.back().find("publish:sns/all:") == 0);
+    CHECK(trace.back().find("tryPublish:sns/all:") == 0);
     CHECK(trace.back().find("|0|1") != std::string::npos);
     strcpy(GlobalStore.ble_status, "PAIR_CONFIRMED");
     update(ble, fake_tick + 1);
@@ -401,7 +430,7 @@ int main() {
         update(app, fake_tick + 1);
     }
     CHECK(ui_input.polls == 1000); // exactly one drain pass per frame, then EVT_NONE
-    CHECK(countPrefix("publish:sns/all:") >= 49 && countPrefix("publish:sns/all:") <= 51);
+    CHECK(countPrefix("tryPublish:sns/all:") >= 49 && countPrefix("tryPublish:sns/all:") <= 51);
     CHECK(canvas.displayCalls == 4); // boot, two await updates, handover; no OLED RUN repaint
 
     // A published sensor snapshot is consumed once per valid timestamp.
@@ -410,39 +439,39 @@ int main() {
     pat_data.dx = 4;
     pat_data.dy = -3;
     NanoUI::fake_pat_sensor = &pat_sensor;
-    int sensor_count = countPrefix("publish:sns/all:");
-    CHECK(nextSensorMessage(app, sensor_count) == "publish:sns/all:0,0,0|4,-3,1|0|0");
-    sensor_count = countPrefix("publish:sns/all:");
-    CHECK(nextSensorMessage(app, sensor_count) == "publish:sns/all:0,0,0|0,0,1|0|0");
+    int sensor_count = countPrefix("tryPublish:sns/all:");
+    CHECK(nextSensorMessage(app, sensor_count) == "tryPublish:sns/all:0,0,0|4,-3,1|0|0|127|0");
+    sensor_count = countPrefix("tryPublish:sns/all:");
+    CHECK(nextSensorMessage(app, sensor_count) == "tryPublish:sns/all:0,0,0|0,0,1|0|0|127|0");
 
     // Invalid data at the old timestamp is not replayed; a fresh timestamp is.
     pat_data.is_valid = false;
     pat_data.dx = 8;
     pat_data.dy = 6;
-    sensor_count = countPrefix("publish:sns/all:");
-    CHECK(nextSensorMessage(app, sensor_count) == "publish:sns/all:0,0,0|0,0,1|0|0");
+    sensor_count = countPrefix("tryPublish:sns/all:");
+    CHECK(nextSensorMessage(app, sensor_count) == "tryPublish:sns/all:0,0,0|0,0,1|0|0|127|0");
     pat_data.timestamp = 1;
     pat_data.is_valid = true;
     pat_data.dx = -2;
     pat_data.dy = 5;
-    sensor_count = countPrefix("publish:sns/all:");
-    CHECK(nextSensorMessage(app, sensor_count) == "publish:sns/all:0,0,0|-2,5,1|0|0");
+    sensor_count = countPrefix("tryPublish:sns/all:");
+    CHECK(nextSensorMessage(app, sensor_count) == "tryPublish:sns/all:0,0,0|-2,5,1|0|0|127|0");
     NanoUI::fake_pat_sensor = nullptr;
 
-    const int beforeEventSend = countPrefix("publish:sns/all:");
+    const int beforeEventSend = countPrefix("tryPublish:sns/all:");
     const int pollsBeforeEvent = ui_input.polls;
     ui_input.events.push_back(UIEvent{EVT_UP, 0});
     update(app, fake_tick + 1);
     CHECK(ui_input.polls == pollsBeforeEvent + 2);
-    int previous = countPrefix("publish:sns/all:");
+    int previous = countPrefix("tryPublish:sns/all:");
     if (previous == beforeEventSend)
-        while (countPrefix("publish:sns/all:") == previous) update(app, fake_tick + 1);
-    CHECK(trace.back().find("publish:sns/all:0,0,0|0,0,1|0|1") == 0);
-    previous = countPrefix("publish:sns/all:");
+        while (countPrefix("tryPublish:sns/all:") == previous) update(app, fake_tick + 1);
+    CHECK(trace.back().find("tryPublish:sns/all:0,0,0|0,0,1|0|1|127|0") == 0);
+    previous = countPrefix("tryPublish:sns/all:");
     update(app, fake_tick + 19);
-    CHECK(countPrefix("publish:sns/all:") == previous);
+    CHECK(countPrefix("tryPublish:sns/all:") == previous);
     update(app, fake_tick + 1);
-    CHECK(countPrefix("publish:sns/all:") == previous + 1);
+    CHECK(countPrefix("tryPublish:sns/all:") == previous + 1);
     CHECK(canvas.displayCalls == 4);
 
     // Held physical UP+DOWN triggers only after strictly more than 2000ms.
@@ -512,7 +541,7 @@ int main() {
     CyberLinkApp reentered;
     FakeInput reentryInput;
     enterRunning(reentered, canvas, reentryInput);
-    CHECK(countPrefix("publish:sns/all:") == 0);
+    CHECK(countPrefix("tryPublish:sns/all:") == 0);
     reentered.onUnmount();
     CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Transition);
 
@@ -571,7 +600,7 @@ int main() {
     CHECK(observed_tick_wrap);
     CHECK(fake_tick < near_wrap);
     update(wrap, fake_tick + 20u);
-    CHECK(countPrefix("publish:sns/all:") == 1);
+    CHECK(countPrefix("tryPublish:sns/all:") == 1);
     wrap.onUnmount();
     // WIFI uses the proven boot and RX repair without releasing STM32's OLED.
     reset();
@@ -589,7 +618,7 @@ int main() {
     update(wifi, fake_tick + 150);
     update(wifi, fake_tick + 1);
     CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Running);
-    CHECK(countPrefix("publish:sns/all:") == 0);
+    CHECK(countPrefix("tryPublish:sns/all:") == 0);
     Crabit::NetworkWeather::activeFlag() = false;
     update(wifi, fake_tick + 1);
     update(wifi, fake_tick + 1);
@@ -671,27 +700,146 @@ int main() {
     CHECK(background_ble_resume_calls == 0 && !has("BW16_NormalBoot"));
     CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Transition);
 
-    // Diagnostics must reveal a dropped mode command without adding a retry,
-    // ACK wait, rollback or different hardware sequence in this evidence build.
+    // A rejected enqueue still releases the bus first (the proven order), then
+    // fails closed through ForceOff and the normal panel restore. It must not
+    // enter Running or report a successful BW16 UI.
     reset();
+    canvas = Canvas();
     fake_try_publish_result = false;
     CyberLinkApp queue_full_ui;
     FakeInput queue_full_input;
-    enterRunning(queue_full_ui, canvas, queue_full_input);
-    CHECK(countPrefix("tryPublish:sys/mode:UI") == 1 && g_coproc_active);
-    bool saw_failed_admission = false, saw_running_heartbeat = false;
-    update(queue_full_ui, fake_tick + 1001);
-    for (const auto& item : diagnostics) {
+    advanceToUiSend(queue_full_ui, canvas, queue_full_input);
+    CHECK(g_coproc_active && has("Safe_SPI_Release"));
+    CHECK(countPrefix("tryPublish:sys/mode:UI") == 1);
+    CHECK(Crabit::Bw16Ui::requestId() != 0);
+    CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Transition);
+    bool saw_failed_admission = false;
+    for (const auto& item : diagnostics)
         if (item.event == Crabit::CompanionTrace::ModeQueued && item.a == 0 && item.b == 0)
             saw_failed_admission = true;
-        if (item.event == Crabit::CompanionTrace::UiHeartbeat && item.a == 7 && item.b == 1)
-            saw_running_heartbeat = true;
-    }
-    CHECK(saw_failed_admission && saw_running_heartbeat);
-    CHECK(countPrefix("tryPublish:sys/mode:UI") == 1);
+    CHECK(saw_failed_admission);
+    update(queue_full_ui, fake_tick + 1); // PowerOff
+    CHECK(has("BW16_ForceOff"));
+    update(queue_full_ui, fake_tick + 250); // PowerOffWait expiry
+    update(queue_full_ui, fake_tick + 0);   // separate RestoreStart step
+    CHECK(has("Safe_SPI_Claim") && g_coproc_active);
+    update(queue_full_ui, fake_tick + 5); // finishClaim after exact 5ms
+    CHECK(has("HAL_SPI_Init"));
+    update(queue_full_ui, fake_tick + 50); // DisplayWakeWait
+    CHECK(!g_coproc_active);
+    CHECK(canvas.saw("串口发送失败"));
+    CHECK(!canvas.saw("已返回手表"));
+    update(queue_full_ui, fake_tick + 800);
+    CHECK(exits == 1 && has("requestExit"));
     queue_full_ui.onUnmount();
+    CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Inactive);
+
+    // A correlated rejection is honoured only for this request id.
+    reset();
+    canvas = Canvas();
+    CyberLinkApp rejected_ack_ui;
+    FakeInput rejected_ack_input;
+    advanceToUiSend(rejected_ack_ui, canvas, rejected_ack_input);
+    CHECK(Crabit::Bw16Ui::status() == Crabit::Bw16Ui::Status::Waiting);
+    const uint16_t rejected_id = Crabit::Bw16Ui::requestId();
+    CHECK(!Crabit::Bw16Ui::acceptAck(static_cast<uint16_t>(rejected_id + 1), "UI_READY"));
+    CHECK(Crabit::Bw16Ui::status() == Crabit::Bw16Ui::Status::Waiting);
+    CHECK(!Crabit::Bw16Ui::acceptAck(rejected_id, "WIFI_OK")); // unrelated value
+    CHECK(Crabit::Bw16Ui::status() == Crabit::Bw16Ui::Status::Waiting);
+    CHECK(Crabit::Bw16Ui::acceptAck(rejected_id, "REJECTED"));
+    CHECK(Crabit::Bw16Ui::status() == Crabit::Bw16Ui::Status::Failed);
+    update(rejected_ack_ui, fake_tick + 150); // ModeWait sees the rejection
+    CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Transition);
+    update(rejected_ack_ui, fake_tick + 1); // PowerOff
+    CHECK(has("BW16_ForceOff"));
+    update(rejected_ack_ui, fake_tick + 250);
+    update(rejected_ack_ui, fake_tick + 0);
+    CHECK(has("Safe_SPI_Claim") && g_coproc_active);
+    update(rejected_ack_ui, fake_tick + 5);
+    update(rejected_ack_ui, fake_tick + 50);
+    CHECK(canvas.saw("UI REJECTED") && !canvas.saw("已返回手表"));
+    rejected_ack_ui.onUnmount();
+
+    // Mixed firmware: an older BW16 starts UI but sends no answer. The STM32
+    // must time out, power off, and restore instead of claiming Running.
+    reset();
+    canvas = Canvas();
+    CyberLinkApp old_peer_ui;
+    FakeInput old_peer_input;
+    advanceToUiSend(old_peer_ui, canvas, old_peer_input);
+    const uint32_t ui_sent_at = fake_tick;
+    update(old_peer_ui, fake_tick + 150); // ModeWait -> UiReadyWait
+    CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::AwaitUi);
+    CHECK(!has("BW16_ForceOff"));
+    update(old_peer_ui, ui_sent_at + 2999);
+    CHECK(!has("BW16_ForceOff"));
+    update(old_peer_ui, ui_sent_at + 3000); // protocol-only timeout
+    CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Transition);
+    update(old_peer_ui, fake_tick + 1);
+    CHECK(has("BW16_ForceOff"));
+    update(old_peer_ui, fake_tick + 250);
+    update(old_peer_ui, fake_tick + 0);
+    CHECK(has("Safe_SPI_Claim") && g_coproc_active);
+    update(old_peer_ui, fake_tick + 5);
+    update(old_peer_ui, fake_tick + 50);
+    CHECK(canvas.saw("UI TIMEOUT") && !canvas.saw("已返回手表"));
+    CHECK(!g_coproc_active);
+    update(old_peer_ui, fake_tick + 800);
+    CHECK(exits == 1 && has("requestExit"));
+    old_peer_ui.onUnmount();
+    CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Inactive);
+
+    // The physical escape remains available while waiting for the answer.
+    reset();
+    canvas = Canvas();
+    CyberLinkApp waiting_escape;
+    FakeInput waiting_escape_input;
+    advanceToUiSend(waiting_escape, canvas, waiting_escape_input);
+    update(waiting_escape, fake_tick + 150); // UiReadyWait
+    gpio_a7 = gpio_a6 = GPIO_PIN_RESET;
+    update(waiting_escape, fake_tick + 1);
+    update(waiting_escape, fake_tick + 2001);
+    CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Transition);
+    update(waiting_escape, fake_tick + 1);
+    CHECK(has("BW16_ForceOff"));
+    update(waiting_escape, fake_tick + 250);
+    update(waiting_escape, fake_tick + 0);
+    CHECK(has("Safe_SPI_Claim") && g_coproc_active);
+    update(waiting_escape, fake_tick + 5);
+    update(waiting_escape, fake_tick + 50);
+    CHECK(canvas.saw("已返回手表") && !g_coproc_active);
+    update(waiting_escape, fake_tick + 800);
+    CHECK(exits == 1 && has("requestExit"));
+    waiting_escape.onUnmount();
+    CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Inactive);
     CHECK(diagnostics.back().event == Crabit::CompanionTrace::UiStage &&
           (diagnostics.back().b & 8u) != 0);
+
+    // A failed finishClaim() must not clear the ownership latch or paint a
+    // recovered screen; the session stays fail-closed in Transition.
+    reset();
+    canvas = Canvas();
+    CyberLinkApp claim_fail_ui;
+    FakeInput claim_fail_input;
+    enterRunning(claim_fail_ui, canvas, claim_fail_input);
+    gpio_a7 = gpio_a6 = GPIO_PIN_RESET;
+    update(claim_fail_ui, fake_tick + 1);
+    update(claim_fail_ui, fake_tick + 2001);
+    update(claim_fail_ui, fake_tick + 1);
+    CHECK(has("BW16_ForceOff"));
+    update(claim_fail_ui, fake_tick + 250);
+    update(claim_fail_ui, fake_tick + 0);
+    CHECK(has("Safe_SPI_Claim") && g_coproc_active);
+    fake_finish_claim_result = false;
+    update(claim_fail_ui, fake_tick + 5);
+    update(claim_fail_ui, fake_tick + 0); // separate RestoreFailed step
+    CHECK(has("HAL_SPI_Init"));
+    CHECK(g_coproc_active);                 // ownership never released falsely
+    CHECK(!canvas.saw("已返回手表"));
+    CHECK(exits == 1 && has("requestExit"));
+    CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Transition);
+    claim_fail_ui.onUnmount();
+    CHECK(Crabit::ameba_phase.load() == Crabit::AmebaPhase::Transition);
 
     if (failures) return 1;
     puts("STM32 AMEBA frame host checks passed");

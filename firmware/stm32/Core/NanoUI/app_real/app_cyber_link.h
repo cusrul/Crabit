@@ -2,6 +2,9 @@
 #define APP_CYBER_LINK_H
 
 #include "NanoUI/NanoUI.h"
+#include "topics.h"
+#include "comms_link.h"
+#include "bw16_ui_link.h"
 #include "event_bus.h"
 #include "app_coproc.h"
 #include "hw_input.h"
@@ -27,8 +30,15 @@ private:
     enum class State : uint8_t {
         PauseBleWait, Boot, AwaitReady, UartFailed, HandoverStart, HandoverWait, ModeWait, Running,
         PowerOff, PowerOffWait, RestoreStart, SpiWait, DisplayWakeWait,
-        RecoveredWait, Done
+        RecoveredWait, Done,
+        // Appended so existing numeric diagnostic stages keep their values.
+        UiReadyWait, RestoreFailed
     };
+
+    // Bounded wait for the BW16 to claim the panel and answer the correlated
+    // UI command. This is a protocol deadline, not a change to any proven
+    // boot, release or panel timing.
+    static constexpr uint32_t UiReadyTimeoutMs = 3000;
 
     Canvas* canvas = nullptr;         // Borrowed from the platform.
     InputDriver* input = nullptr;
@@ -40,6 +50,7 @@ private:
     int dot_cnt = 0;
     uint32_t hard_reset_timer = 0;
     bool reset_held = false;
+    const char* ui_fail_label = nullptr;
     int16_t accum_dx = 0;
     int16_t accum_dy = 0;
     uint8_t accum_btn_mask = 0;
@@ -206,6 +217,7 @@ private:
         if (uint32_t(now - last_sensor_sync) >= 20) {
             last_sensor_sync = now;
             uint8_t tx_mask = accum_btn_mask;
+            if (crabit_pat_hold) tx_mask |= (1 << 6);
             if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_7) == GPIO_PIN_RESET) tx_mask |= (1 << 0);
             if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6) == GPIO_PIN_RESET) tx_mask |= (1 << 1);
             // PH3 remains exclusively decoded by input->poll().
@@ -229,7 +241,7 @@ private:
                      (int)(ax*100), (int)(ay*100), (int)(az*100),
                      accum_dx, accum_dy, lift, bat, tx_mask,
                      (int)(brightness * 255.0f), brightness < 0.15f ? 1 : 0);
-            EventBus::publish("sns/all", val_buf);
+            CrabitLink::send(Topics::SnsAll, val_buf);
             accum_dx = 0;
             accum_dy = 0;
             accum_btn_mask = 0;
@@ -253,6 +265,8 @@ public:
         optical_sample_seen = false;
         background_result = "OFF";
         mode_sent_at = 0;
+        ui_fail_label = nullptr;
+        Crabit::Bw16Ui::cancel();
         resume_ble_on_exit = mode == Mode::Ui && Crabit::CompanionBle::active();
         last_trace_state = State::Done;
         last_trace_tick = HAL_GetTick();
@@ -329,7 +343,7 @@ public:
                 showStatus(mode == Mode::Wifi ? "等待无线就绪" : labels[dot_cnt]);
             }
             if (uint32_t(now - state_start) > 1200) {
-                const bool uart_ready = STM32_PrepareAmebaUartRx();
+                const bool uart_ready = Uart::prepareAmebaRx();
                 if (mode == Mode::Ui)
                     Crabit::CompanionTrace::record(Crabit::CompanionTrace::RxPrepared, 0, uart_ready ? 1u : 0u);
                 if (uart_ready) {
@@ -357,13 +371,13 @@ public:
             if (uint32_t(now - state_start) < 150) break;
             if (mode == Mode::Ui) {
                 canvas->clear(); canvas->display();
-                Safe_SPI_Release();
+                Display::releaseBus();
                 g_coproc_active = true;
                 traceUiStage();
             }
             // Same proven ordinary mode-command path; no sys/comm session.
             if (mode == Mode::BleBackground) {
-                if (!EventBus::tryPublish("sys/mode", "BLE", Crabit::CompanionBle::sessionId())) {
+                if (!CrabitLink::send(Topics::SysMode, "BLE", Crabit::CompanionBle::sessionId())) {
                     background_result = "UART SEND FAILED";
                     showStatus(background_result);
                     state = State::PowerOff;
@@ -371,24 +385,87 @@ public:
                 }
                 mode_sent_at = HAL_GetTick();
             } else if (mode == Mode::Wifi) {
-                if (!EventBus::tryPublish("sys/mode", "WIFI", Crabit::NetworkWeather::session())) {
+                if (!CrabitLink::send(Topics::SysMode, "WIFI", Crabit::NetworkWeather::session())) {
                     Crabit::NetworkWeather::abort("TX_FAILED"); state = State::PowerOff; break;
                 }
             } else {
-                // Same single enqueue as publish(), preserving failure behavior
-                // for this diagnostic build; record admission without retrying.
-                const bool queued = EventBus::tryPublish("sys/mode", mode == Mode::Ui ? "UI" : "BLE", 0);
+                // UI carries a non-zero request id so the BW16 answer can be
+                // matched to this handover. The BW16 acknowledges only after it
+                // has initialized the panel; older firmware sends no answer and
+                // therefore falls into the bounded fail-safe path below.
+                const bool ui = mode == Mode::Ui;
+                const uint16_t request_id = ui ? Crabit::Bw16Ui::begin() : 0;
+                const bool queued = CrabitLink::send(Topics::SysMode, ui ? "UI" : "BLE",
+                                                     request_id);
                 Crabit::CompanionTrace::record(Crabit::CompanionTrace::ModeQueued, 0,
-                    mode == Mode::Ui ? 0u : 1u, queued ? 1u : 0u);
+                    ui ? 0u : 1u, queued ? 1u : 0u);
+                if (ui && !queued) {
+                    // The bus is already released, so do not paint here. Use the
+                    // existing force-off and claim path to recover the panel.
+                    ui_fail_label = "UART SEND FAILED";
+                    Crabit::setAmebaPhase(Crabit::AmebaPhase::Transition);
+                    state = State::PowerOff;
+                    break;
+                }
+                if (ui) mode_sent_at = now;
             }
             waitIn(State::ModeWait);
             break;
         case State::ModeWait:
             if (uint32_t(now - state_start) < 150) break;
+            if (mode == Mode::Ui) {
+                // Open the EventBus path for the queued sys/ack, but do not
+                // advertise a running UI until the peer confirms its claim.
+                Crabit::setAmebaPhase(Crabit::AmebaPhase::AwaitUi);
+                const Crabit::Bw16Ui::Status peer = Crabit::Bw16Ui::status();
+                if (peer == Crabit::Bw16Ui::Status::Ready) {
+                    Crabit::setAmebaPhase(Crabit::AmebaPhase::Running);
+                    state = State::Running;
+                    break;
+                }
+                if (peer == Crabit::Bw16Ui::Status::Failed) {
+                    ui_fail_label = Crabit::Bw16Ui::failure() ? Crabit::Bw16Ui::failure()
+                                                              : "UI NOT READY";
+                    Crabit::setAmebaPhase(Crabit::AmebaPhase::Transition);
+                    state = State::PowerOff;
+                    break;
+                }
+                waitIn(State::UiReadyWait);
+                break;
+            }
             state = State::Running;
             Crabit::setAmebaPhase(Crabit::AmebaPhase::Running);
             if (mode == Mode::Wifi) showStatus(Crabit::NetworkWeather::label());
             else if (mode != Mode::Ui) showStatus("WAIT BLE");
+            break;
+        case State::UiReadyWait:
+            {
+                // The STM32 still keeps its physical UP+DOWN escape while the
+                // BW16 owns the panel; never depend on a peer notification to
+                // leave a non-starting UI.
+                checkEscape(now);
+                if (state == State::PowerOff) break;
+                const Crabit::Bw16Ui::Status peer = Crabit::Bw16Ui::status();
+                if (peer == Crabit::Bw16Ui::Status::Ready) {
+                    Crabit::setAmebaPhase(Crabit::AmebaPhase::Running);
+                    state = State::Running;
+                    break;
+                }
+                if (peer == Crabit::Bw16Ui::Status::Failed) {
+                    ui_fail_label = Crabit::Bw16Ui::failure() ? Crabit::Bw16Ui::failure()
+                                                              : "UI NOT READY";
+                    Crabit::setAmebaPhase(Crabit::AmebaPhase::Transition);
+                    state = State::PowerOff;
+                    break;
+                }
+                // No answer from old or non-cooperating firmware: never assume
+                // the BW16 owns a working UI. Fall back through ForceOff.
+                if (uint32_t(now - mode_sent_at) >= UiReadyTimeoutMs) {
+                    ui_fail_label = "UI TIMEOUT";
+                    Crabit::setAmebaPhase(Crabit::AmebaPhase::Transition);
+                    state = State::PowerOff;
+                }
+            }
             break;
         case State::Running:
             if (mode == Mode::Wifi) {
@@ -448,22 +525,35 @@ public:
             }
             break;
         case State::RestoreStart:
-            Safe_SPI_Claim();
-            HAL_SPI_DeInit(&hspi3);
+            Display::beginClaim();
             waitIn(State::SpiWait);
             break;
         case State::SpiWait:
             if (uint32_t(now - state_start) < 5) break;
-            HAL_SPI_Init(&hspi3);
-            OLED_Init();
-            OLED_SetSleep(false);
-            waitIn(State::DisplayWakeWait);
+            if (Display::finishClaim()) {
+                waitIn(State::DisplayWakeWait);
+            } else {
+                // Keep g_coproc_active latched and never paint a recovered
+                // screen if the SPI/panel re-initialization failed.
+                Crabit::setAmebaPhase(Crabit::AmebaPhase::Transition);
+                Crabit::CompanionTrace::record(Crabit::CompanionTrace::Failed, 0,
+                    static_cast<uint32_t>(state), 0);
+                waitIn(State::RestoreFailed);
+            }
             break;
         case State::DisplayWakeWait:
             if (uint32_t(now - state_start) < 50) break;
             g_coproc_active = false;
-            showStatus("STM32 RECOVERED!");
+            // A UI handover that timed out or was rejected is a real recovery,
+            // but not a successful BW16 UI start; report it explicitly.
+            showStatus(ui_fail_label ? ui_fail_label : "STM32 RECOVERED!");
             waitIn(State::RecoveredWait);
+            break;
+        case State::RestoreFailed:
+            // The BW16 is already off, but the STM32 cannot prove that it owns a
+            // working panel. Leave the session phase in Transition so STOP2 and
+            // PMU recovery stay inhibited, and let the manager remove the app.
+            requestExit();
             break;
         case State::RecoveredWait:
             if (uint32_t(now - state_start) < 800) break;
@@ -480,6 +570,7 @@ public:
     // In RUN, no render callback or ordinary WindowManager draw owns this OLED.
     void onUnmount() override {
         if (mode == Mode::Wifi) Crabit::NetworkWeather::cancel();
+        Crabit::Bw16Ui::cancel();
         canvas = nullptr;
         input = nullptr;
         // An unexpected forced removal must not silently authorize PMU recovery

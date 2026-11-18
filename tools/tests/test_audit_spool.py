@@ -59,11 +59,11 @@ class AuditSpoolTests(unittest.TestCase):
             subprocess.run([str(binary)], check=True)
 
     def test_relay_does_not_initialize_radio_or_touch_flash(self):
-        for path in ("AuditRelay.cpp", "app/app_ble_sync.h"):
+        for path in ("AuditRelay.cpp", "app/apps/wireless/app_ble_sync.h"):
             source = (ROOT / "firmware/rtl8720dn/NanoUI" / path).read_text(encoding="utf-8")
             for forbidden in ("BLE.init(", "BLE.end(", "wifi_off(", "Preferences", "Flash_Write"):
                 self.assertNotIn(forbidden, source)
-        source = (ROOT / "firmware/rtl8720dn/NanoUI/app/app_wifi_sniff.h").read_text(
+        source = (ROOT / "firmware/rtl8720dn/NanoUI/app/apps/wireless/app_wifi_sniff.h").read_text(
             encoding="utf-8"
         )
         self.assertIn("AuditRelay::tick();", source)

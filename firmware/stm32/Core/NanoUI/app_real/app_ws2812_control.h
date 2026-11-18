@@ -9,7 +9,7 @@
 #include <vector>
 #include <string>
 
-extern "C" void USB_LOG(const char* format, ...);
+#include "usb.h"
 
 class WS2812ControlApp : public Application {
 private:

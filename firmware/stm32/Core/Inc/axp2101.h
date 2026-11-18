@@ -49,6 +49,7 @@ extern "C" {
 #define AXP2101_ADC_DATA_RELUST8                 (0x3C) // TEMP H
 #define AXP2101_ADC_DATA_RELUST9                 (0x3D) // TEMP L
 
+#define AXP2101_BAT_DET_CTRL                     (0x68)
 #define AXP2101_DC_ONOFF_DVM_CTRL                (0x80)
 #define AXP2101_DC_VOL0_CTRL                     (0x82) // DCDC1
 #define AXP2101_DC_VOL1_CTRL                     (0x83) // DCDC2
@@ -74,63 +75,99 @@ extern "C" {
 // =========================================================
 
 /**
- * @brief Initialize AXP2101 with professional defaults from XPowersLib
+ * @brief Configure board power rails, input limit and ADC channels.
  * @return HAL_StatusTypeDef
  */
-HAL_StatusTypeDef AXP2101_Init(I2C_HandleTypeDef *hi2c);
+HAL_StatusTypeDef AXP2101_Init(void);
+
+// Boot-only optional gauge setup. Failure does not affect VBAT or charging reads.
+bool AXP2101_InitFuelGauge(void);
 
 /**
  * @brief Read battery voltage in mV
+ * @param out_mv Receives the raw ADC value. Untouched when the read fails.
+ * @return true only when both ADC bytes were read successfully.
  */
-uint16_t AXP2101_GetBattVoltage(I2C_HandleTypeDef *hi2c);
+bool AXP2101_TryGetBattVoltage(uint16_t *out_mv);
 
 /**
- * @brief Read battery percentage (0-100)
+ * @brief Read battery voltage in mV
+ * @return Raw ADC value, or 0 when the read failed. 0 is not a measurement;
+ *         use AXP2101_TryGetBattVoltage to distinguish failure from data.
  */
-uint8_t AXP2101_GetBatteryPercent(I2C_HandleTypeDef *hi2c);
+uint16_t AXP2101_GetBattVoltage(void);
+
+/**
+ * @brief Read the raw fuel-gauge percentage byte without masking.
+ *
+ * Success requires gauge setup, a connected battery, a successful 0xA4 read, and a raw
+ * value in 0..100. Any other condition means the percentage is unknown:
+ * register reads never invent a level, and datasheet-invalid bytes such as
+ * 0xE3 (>=101) are rejected rather than masked into a plausible 0..100 value.
+ *
+ * @param out_percent Receives 0..100. Untouched on failure.
+ * @return true when out_percent holds a valid gauge reading.
+ */
+bool AXP2101_TryGetBatteryPercent(uint8_t *out_percent);
+
+/**
+ * @brief Legacy percentage accessor (0-100)
+ * @return A valid gauge reading, or 0 when the percentage is unknown.
+ *         Use AXP2101_TryGetBatteryPercent where unknown matters.
+ */
+uint8_t AXP2101_GetBatteryPercent(void);
 
 /**
  * @brief Read internal temperature in Celsius
  */
-float AXP2101_GetInternalTemp(I2C_HandleTypeDef *hi2c);
+float AXP2101_GetInternalTemp(void);
 
 /**
  * @brief Read VBUS voltage in mV
  */
-uint16_t AXP2101_GetVbusVoltage(I2C_HandleTypeDef *hi2c);
+uint16_t AXP2101_GetVbusVoltage(void);
 
 /**
  * @brief Check if VBUS is present
  */
-bool AXP2101_IsVbusIn(I2C_HandleTypeDef *hi2c);
+bool AXP2101_IsVbusIn(void);
 
 /**
  * @brief Check if charging is active
+ * @param out_charging Receives the charge state. Untouched when the read fails.
+ * @return true when STATUS2 was read successfully.
  */
-bool AXP2101_IsCharging(I2C_HandleTypeDef *hi2c);
+bool AXP2101_TryGetCharging(bool *out_charging);
+
+/**
+ * @brief Legacy charge-state accessor
+ * @return true only when charging was read successfully and is active.
+ *         false also means "not charging or unknown".
+ */
+bool AXP2101_IsCharging(void);
 
 /**
  * @brief Set DCDC1 voltage
  */
-HAL_StatusTypeDef AXP2101_SetDC1Voltage(I2C_HandleTypeDef *hi2c, uint16_t mv);
+HAL_StatusTypeDef AXP2101_SetDC1Voltage(uint16_t mv);
 // Write, wait, then verify voltage selection and output enable. This verifies
 // PMIC configuration only; it is not an analog measurement of STM32 VDD.
-HAL_StatusTypeDef AXP2101_SetDC1VoltageChecked(I2C_HandleTypeDef *hi2c, uint16_t mv);
+HAL_StatusTypeDef AXP2101_SetDC1VoltageChecked(uint16_t mv);
 
 /**
  * @brief Set DCDC3 voltage (Special handling for ranges)
  */
-HAL_StatusTypeDef AXP2101_SetDC3Voltage(I2C_HandleTypeDef *hi2c, uint16_t mv);
+HAL_StatusTypeDef AXP2101_SetDC3Voltage(uint16_t mv);
 
 /**
  * @brief Enable or disable DCDC3 output
  */
-HAL_StatusTypeDef AXP2101_SetDC3Enable(I2C_HandleTypeDef *hi2c, bool enable);
+HAL_StatusTypeDef AXP2101_SetDC3Enable(bool enable);
 
 /**
  * @brief Get current DCDC3 voltage setting in mV
  */
-uint16_t AXP2101_GetDC3Voltage(I2C_HandleTypeDef *hi2c);
+uint16_t AXP2101_GetDC3Voltage(void);
 
 // 兼容性接口：直接写入寄存器值以进行步进测试
 void AXP2101_SetDCDC3_Test(uint8_t val);
@@ -139,21 +176,21 @@ void AXP2101_SetDCDC3_Test(uint8_t val);
  * @brief Set ALDO voltage
  * @param channel 1-4 for ALDO1-4
  */
-HAL_StatusTypeDef AXP2101_SetALDOVoltage(I2C_HandleTypeDef *hi2c, uint8_t channel, uint16_t mv);
+HAL_StatusTypeDef AXP2101_SetALDOVoltage(uint8_t channel, uint16_t mv);
 
 /**
  * @brief Reduce AXP2101-powered domains before STM32 STOP2.
  */
-HAL_StatusTypeDef AXP2101_EnterLowPower(I2C_HandleTypeDef *hi2c);
+HAL_StatusTypeDef AXP2101_EnterLowPower(void);
 
 /**
  * @brief Restore AXP2101 rails after STM32 wakes from STOP2.
  */
-HAL_StatusTypeDef AXP2101_ExitLowPower(I2C_HandleTypeDef *hi2c);
+HAL_StatusTypeDef AXP2101_ExitLowPower(void);
 
 // Utility
-HAL_StatusTypeDef AXP2101_WriteReg(I2C_HandleTypeDef *hi2c, uint8_t reg, uint8_t val);
-HAL_StatusTypeDef AXP2101_ReadReg(I2C_HandleTypeDef *hi2c, uint8_t reg, uint8_t *val);
+HAL_StatusTypeDef AXP2101_WriteReg(uint8_t reg, uint8_t val);
+HAL_StatusTypeDef AXP2101_ReadReg(uint8_t reg, uint8_t *val);
 
 #ifdef __cplusplus
 }
